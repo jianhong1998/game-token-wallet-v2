@@ -86,10 +86,12 @@ jobs:
 
   # cimg/base:current: confirmed (CircleCI-Public/cimg-base migrated to an
   # Ubuntu 24.04 base in mid-2025, per CircleCI's own discuss.circleci.com
-  # thread "Convenience image cimg/node uses 2 year old Ubuntu 22 base")
-  # to ship glibc 2.39+, which anchor-cli 1.1.2's prebuilt binary requires.
+  # thread "Convenience image cimg/node uses 2 year old Ubuntu 22 base").
   # `:current` is a moving tag, so this isn't a hard pin — see report for
-  # residual risk.
+  # residual risk. That said, this job (see below) installs nothing but a
+  # bare Rust toolchain via rustup, which has no specific glibc floor to
+  # defend here — unlike `on-chain-program-e2e`, it has no anchor-cli
+  # prebuilt binary whose GLIBC_2.39+ requirement would need pinning against.
   #
   # This job only runs `cargo test` on the on-chain-program crate, which has
   # exactly one trivial macro-generated test (`test_id`, from Anchor's
