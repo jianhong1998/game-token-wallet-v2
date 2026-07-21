@@ -12,7 +12,7 @@ PRD says CircleCI, docker self-hosted (env vars not baked at build time),
 devnet deploy with env-controlled program ID. Not yet discussed:
 
 - Pipeline stages — what runs on every PR vs. only on merge to main (lint,
-  typecheck, `anchor test`, web `jest`, docker build, devnet deploy)?
+  typecheck, `anchor test`, web `vitest`, docker build, devnet deploy)?
 - Is devnet deploy automatic on merge, or manual/gated?
 - Docker self-hosting note: since this app has no client-side wallet, likely
   _no_ `NEXT_PUBLIC_*` env vars are needed at all (everything Solana-related
@@ -66,3 +66,15 @@ finalized:
   needs calculating against Solana's tx size limit.
 
 `MAX_PLAYER_PER_GAME` itself is already fixed at 20 by the PRD.
+
+## CI devnet-deploy signing key provisioning
+
+CircleCI's devnet-deploy job (ticket 004) needs a signing keypair to deploy
+the program to devnet. This is distinct from a self-hoster's own runtime
+system admin wallet (already covered: env-configured, self-hoster's choice)
+— this is the project's *own* CI secret. Not yet discussed:
+
+- How is that keypair provisioned to CircleCI (CircleCI encrypted env var /
+  contexts vs. an external secrets manager)?
+- Is it the same keypair used for local/manual devnet testing, or a
+  dedicated CI-only key?

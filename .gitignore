@@ -1,0 +1,14 @@
+*.local.*
+.DS_Store
+
+# NodeJS
+node_modules
+
+
+# Temporary folders
+temp
+
+# Environment variables
+.env
+.env*.local
+!.env.template
