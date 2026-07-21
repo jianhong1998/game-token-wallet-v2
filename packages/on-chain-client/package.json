@@ -6,6 +6,8 @@
   "types": "src/index.ts",
   "scripts": {
     "codegen": "node scripts/generate-client.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

@@ -29,6 +29,9 @@ importers:
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
 
   apps/frontend:
     dependencies:
@@ -90,6 +93,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/on-chain-client
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

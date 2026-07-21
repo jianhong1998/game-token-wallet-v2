@@ -16,6 +16,7 @@ import {
   airdropFactory,
   getSignatureFromTransaction,
   lamports,
+  assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
 import { getNoopInstruction, GAME_TOKEN_WALLET_PROGRAM_ADDRESS } from "on-chain-client";
 
@@ -52,6 +53,11 @@ describe("noop instruction round trip", () => {
     );
 
     const signedTransaction = await signTransactionMessageWithSigners(transactionMessage);
+    // `signTransactionMessageWithSigners` returns the non-generic `TransactionWithLifetime`
+    // (blockhash-or-nonce union) rather than preserving the blockhash-specific lifetime we set
+    // above, so narrow it back with the library's own assertion before handing it to
+    // `sendAndConfirmTransaction`, which requires a blockhash-lifetime transaction.
+    assertIsTransactionWithBlockhashLifetime(signedTransaction);
     const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions });
 
     await expect(
