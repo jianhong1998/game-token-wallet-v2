@@ -66,3 +66,15 @@ finalized:
   needs calculating against Solana's tx size limit.
 
 `MAX_PLAYER_PER_GAME` itself is already fixed at 20 by the PRD.
+
+## CI devnet-deploy signing key provisioning
+
+CircleCI's devnet-deploy job (ticket 004) needs a signing keypair to deploy
+the program to devnet. This is distinct from a self-hoster's own runtime
+system admin wallet (already covered: env-configured, self-hoster's choice)
+— this is the project's *own* CI secret. Not yet discussed:
+
+- How is that keypair provisioned to CircleCI (CircleCI encrypted env var /
+  contexts vs. an external secrets manager)?
+- Is it the same keypair used for local/manual devnet testing, or a
+  dedicated CI-only key?
