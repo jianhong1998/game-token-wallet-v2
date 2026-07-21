@@ -21,7 +21,7 @@ import {
 } from "../instructions";
 
 export const GAME_TOKEN_WALLET_PROGRAM_ADDRESS =
-  "4qetKWMztCYZLp9zqLZiNjmnSfy13JM5VAjkKmU8g42X" as Address<"4qetKWMztCYZLp9zqLZiNjmnSfy13JM5VAjkKmU8g42X">;
+  "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t" as Address<"FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t">;
 
 export enum GameTokenWalletInstruction {
   Noop,
@@ -48,7 +48,7 @@ export function identifyGameTokenWalletInstruction(
 }
 
 export type ParsedGameTokenWalletInstruction<
-  TProgram extends string = "4qetKWMztCYZLp9zqLZiNjmnSfy13JM5VAjkKmU8g42X",
+  TProgram extends string = "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t",
 > = {
   instructionType: GameTokenWalletInstruction.Noop;
 } & ParsedNoopInstruction<TProgram>;

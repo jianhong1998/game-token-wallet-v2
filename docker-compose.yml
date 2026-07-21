@@ -72,17 +72,14 @@ services:
     environment:
       SOLANA_CLUSTER: localnet
       SOLANA_RPC_URL: http://surfpool:8899
-      # Re-synced during this task: the `target/deploy/*-keypair.json` that
-      # determines the real deployed address is gitignored (private key
-      # material, correctly never committed) and this session's local
-      # keypair — the one program-deploy actually builds/deploys with —
-      # no longer matches the address recorded in Task 2's commit
-      # (`BWS4UCkFps4XUs7bqqzgNxFZ3keLUMVbb9CJUpyefNob`; that keypair's
-      # private key isn't recoverable in this environment). Ran
-      # `anchor keys sync` to reconcile `declare_id!`/`Anchor.toml` to the
-      # keypair that's actually present, then used that here so the
-      # frontend targets the program that's actually deployed.
-      PROGRAM_ID: "4qetKWMztCYZLp9zqLZiNjmnSfy13JM5VAjkKmU8g42X"
+      # Fixed local-dev program deploy identity — matches the throwaway
+      # keypair committed at docker/local/fixtures/game_token_wallet-keypair.dev.json
+      # (see the README alongside it), which docker/local/Dockerfile.anchor
+      # seeds into `target/deploy/game_token_wallet-keypair.json` before
+      # every `anchor build`. This guarantees program-deploy always deploys
+      # to this exact address, on every machine and every rebuild, instead
+      # of drifting whenever the gitignored keypair goes missing.
+      PROGRAM_ID: "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t"
       SYSTEM_ADMIN_SECRET_KEY: "PzfkD238UH1WRMoQZpt9uJpJda2eLJYtv7Bi7qscpjWH3E1Fjm2odmcSu1XDz1FTz2yZfBWfYBYU4arQzFNNmis"
     volumes:
       - .:/workspace

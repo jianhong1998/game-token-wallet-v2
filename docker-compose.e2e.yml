@@ -46,6 +46,8 @@ services:
     # service_completed_successfully.
     command:
       - >-
+        mkdir -p apps/on-chain-program/target/deploy &&
+        cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json &&
         solana airdrop 10 --url "$$ANCHOR_PROVIDER_URL" &&
         solana airdrop 10 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV --url "$$ANCHOR_PROVIDER_URL" &&
         cd apps/on-chain-program && anchor build && anchor deploy --provider.cluster "$$ANCHOR_PROVIDER_URL" &&
@@ -82,11 +84,10 @@ services:
     environment:
       SOLANA_CLUSTER: localnet
       SOLANA_RPC_URL: http://surfpool:8899
-      # Real deployed program ID — confirmed fresh from
-      # apps/on-chain-program/Anchor.toml's [programs.localnet] entry and
-      # target/idl/game_token_wallet.json's `address` field at execution
-      # time (re-synced during Task 9; matches docker-compose.yml).
-      PROGRAM_ID: "4qetKWMztCYZLp9zqLZiNjmnSfy13JM5VAjkKmU8g42X"
+      # Fixed local-dev program deploy identity — matches the throwaway
+      # keypair committed at docker/local/fixtures/game_token_wallet-keypair.dev.json
+      # (see the README alongside it) and docker-compose.yml's PROGRAM_ID.
+      PROGRAM_ID: "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t"
       SYSTEM_ADMIN_SECRET_KEY: "PzfkD238UH1WRMoQZpt9uJpJda2eLJYtv7Bi7qscpjWH3E1Fjm2odmcSu1XDz1FTz2yZfBWfYBYU4arQzFNNmis"
     # Not in the plan's original compose text — added because `e2e` would
     # otherwise race `next start`'s boot time (no webServer wait built into
