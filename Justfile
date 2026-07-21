@@ -28,5 +28,6 @@ dev-down:
 test:
   @cargo test --manifest-path apps/on-chain-program/Cargo.toml
   @pnpm --filter frontend run test
+  @pnpm --filter on-chain-client run test
   @cd apps/on-chain-program && anchor test
   @docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e

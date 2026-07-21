@@ -69,6 +69,7 @@ jobs:
       - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter frontend run test
+      - run: pnpm --filter on-chain-client run test
 
   # cimg/base:current: confirmed (CircleCI-Public/cimg-base migrated to an
   # Ubuntu 24.04 base in mid-2025, per CircleCI's own discuss.circleci.com
