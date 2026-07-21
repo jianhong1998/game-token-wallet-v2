@@ -1,0 +1,127 @@
+version: 2.1
+
+# Shared Solana/Anchor toolchain install, used by `cargo-test` and
+# `on-chain-program-e2e`. This is NOT the plan's original one-liner
+# (`curl ... solana-install.solana.workers.dev | bash` + bare
+# `avm install latest`) — it's the sequence actually confirmed working in
+# `docker/local/Dockerfile.anchor` during Task 9:
+#   - Solana CLI comes from the official `release.anza.xyz/stable/install`
+#     script (the `solana-install.solana.workers.dev` one-liner referenced
+#     in the original plan draft was replaced during Task 9).
+#   - `avm` has no prebuilt binaries for any platform, so it's built from
+#     source via `cargo install`, which needs Rust installed first.
+#   - anchor-cli is pinned to 1.1.2 via `avm install 1.1.2 && avm use 1.1.2`
+#     (not `avm install latest`) to match the prebuilt binary confirmed
+#     working in Task 9 — `avm install latest` would float to whatever is
+#     newest at CI run time and is unverified.
+# Each PATH addition is appended to $BASH_ENV rather than exported inline,
+# because CircleCI runs every `run` step in a fresh non-login shell that
+# only inherits env set via $BASH_ENV from prior steps.
+commands:
+  install_anchor_toolchain:
+    steps:
+      - run:
+          name: Install Rust
+          command: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      - run:
+          name: Add cargo to PATH
+          command: echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Install Solana CLI
+          command: sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+      - run:
+          name: Add Solana CLI to PATH
+          command: echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Install avm
+          command: cargo install --git https://github.com/solana-foundation/anchor --tag v1.1.2 avm --locked
+      - run:
+          name: Add avm to PATH
+          command: echo 'export PATH="$HOME/.avm/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Install and select anchor-cli 1.1.2
+          command: avm install 1.1.2 && avm use 1.1.2
+
+jobs:
+  lint:
+    docker:
+      - image: cimg/node:24.18
+    steps:
+      - checkout
+      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    docker:
+      - image: cimg/node:24.18
+    steps:
+      - checkout
+      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  web-unit-tests:
+    docker:
+      - image: cimg/node:24.18
+    steps:
+      - checkout
+      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend run test
+
+  # cimg/base:current: confirmed (CircleCI-Public/cimg-base migrated to an
+  # Ubuntu 24.04 base in mid-2025, per CircleCI's own discuss.circleci.com
+  # thread "Convenience image cimg/node uses 2 year old Ubuntu 22 base")
+  # to ship glibc 2.39+, which anchor-cli 1.1.2's prebuilt binary requires.
+  # `:current` is a moving tag, so this isn't a hard pin — see report for
+  # residual risk.
+  cargo-test:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - install_anchor_toolchain
+      - run:
+          name: cargo test
+          working_directory: apps/on-chain-program
+          command: cargo test
+
+  # ubuntu-2404: CircleCI's machine image naming pins the Ubuntu release
+  # explicitly (24.04, glibc 2.39), so this satisfies anchor-cli 1.1.2's
+  # GLIBC_2.39+ requirement without the ambiguity `cimg/base:current` has.
+  on-chain-program-e2e:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - install_anchor_toolchain
+      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: solana-keygen new --no-bip39-passphrase --silent --outfile ~/.config/solana/id.json
+      - run:
+          name: anchor test
+          working_directory: apps/on-chain-program
+          command: anchor test
+
+  # Command left exactly as the plan specifies — Task 10's fix for Compose
+  # aborting the whole stack on the first container exit was made at the
+  # docker-compose.e2e.yml level (program-deploy now blocks on
+  # `tail -f /dev/null` after a healthcheck marker file, instead of
+  # exiting 0), not in this job's command.
+  e2e:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+
+workflows:
+  ci:
+    jobs:
+      - lint
+      - typecheck
+      - web-unit-tests
+      - cargo-test
+      - on-chain-program-e2e
+      - e2e
