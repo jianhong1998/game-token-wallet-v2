@@ -29,6 +29,14 @@ describe("getSolanaContext", () => {
     expect(second).toBe(first);
   });
 
+  it("exposes an rpcSubscriptions client derived from the local-validator RPC URL (8899 -> 8900)", async () => {
+    setValidEnv();
+    process.env.SOLANA_RPC_URL = "http://127.0.0.1:8899";
+    const { getSolanaContext } = await import("./connection");
+    const context = await getSolanaContext();
+    expect(context.rpcSubscriptions).toBeDefined();
+  });
+
   it("rejects when SYSTEM_ADMIN_SECRET_KEY does not decode to 64 bytes", async () => {
     setValidEnv();
     process.env.SYSTEM_ADMIN_SECRET_KEY = "4g78KBwb1F7uAmFYDPKQDjXt9TcoUThChSVDBtCkXxfA";
@@ -42,6 +50,27 @@ describe("getSolanaContext", () => {
     const { getSolanaContext } = await import("./connection");
     await expect(getSolanaContext()).rejects.toThrow(
       /Missing required environment variable: PROGRAM_ID/,
+    );
+  });
+});
+
+describe("deriveWsUrl", () => {
+  it("derives ws port 8900 from the local-validator RPC convention on port 8899", async () => {
+    const { deriveWsUrl } = await import("./connection");
+    expect(deriveWsUrl("http://127.0.0.1:8899")).toBe("ws://127.0.0.1:8900/");
+  });
+
+  it("swaps scheme only for a public-cluster URL with no explicit port", async () => {
+    const { deriveWsUrl } = await import("./connection");
+    expect(deriveWsUrl("https://api.devnet.solana.com")).toBe(
+      "wss://api.devnet.solana.com/",
+    );
+  });
+
+  it("swaps scheme only, without inventing a port, for an explicit non-8899 port", async () => {
+    const { deriveWsUrl } = await import("./connection");
+    expect(deriveWsUrl("https://my-rpc-provider.example.com:443")).toBe(
+      "wss://my-rpc-provider.example.com/",
     );
   });
 });
