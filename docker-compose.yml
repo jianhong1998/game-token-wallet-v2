@@ -1,6 +1,7 @@
 services:
   surfpool:
-    image: surfpool/surfpool:latest
+    # Pinned by digest (not :latest) so upstream image updates can't silently break local dev / CI — bump deliberately when needed.
+    image: surfpool/surfpool@sha256:4f7b64daa96ab42d8a0d46cd0de556b1c90386f56fd66cfdefcb5f7039fdec9f
     command: ["start", "--no-tui"]
     ports:
       - "8899:8899"
