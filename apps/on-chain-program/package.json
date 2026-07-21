@@ -1,0 +1,7 @@
+{
+  "name": "on-chain-program",
+  "private": true,
+  "scripts": {
+    "build": "anchor build"
+  }
+}
