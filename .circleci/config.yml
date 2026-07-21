@@ -1,6 +1,6 @@
 version: 2.1
 
-# Shared Solana/Anchor toolchain install, used by `cargo-test` and
+# Shared toolchain install commands, used by `cargo-test` and
 # `on-chain-program-e2e`. This is NOT the plan's original one-liner
 # (`curl ... solana-install.solana.workers.dev | bash` + bare
 # `avm install latest`) — it's the sequence actually confirmed working in
@@ -17,8 +17,17 @@ version: 2.1
 # Each PATH addition is appended to $BASH_ENV rather than exported inline,
 # because CircleCI runs every `run` step in a fresh non-login shell that
 # only inherits env set via $BASH_ENV from prior steps.
+#
+# `install_rust` is split out on its own because `cargo-test` only runs
+# `cargo test` on a pure-Rust crate with no Solana/Anchor CLI dependency
+# (confirmed: passes with solana/anchor/avm absent from PATH) — it needs
+# a Rust toolchain (cimg/base:current does not ship one; confirmed via
+# `docker run cimg/base:current` — no cargo/rustc present) but none of the
+# Solana-specific pieces below. `on-chain-program-e2e` runs `anchor test`
+# against a real validator and needs the full toolchain, so it composes
+# `install_rust` with the Solana/avm/anchor-cli steps.
 commands:
-  install_anchor_toolchain:
+  install_rust:
     steps:
       - run:
           name: Install Rust
@@ -26,6 +35,10 @@ commands:
       - run:
           name: Add cargo to PATH
           command: echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
+
+  install_anchor_toolchain:
+    steps:
+      - install_rust
       - run:
           name: Install Solana CLI
           command: sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
@@ -77,12 +90,20 @@ jobs:
   # to ship glibc 2.39+, which anchor-cli 1.1.2's prebuilt binary requires.
   # `:current` is a moving tag, so this isn't a hard pin — see report for
   # residual risk.
+  #
+  # This job only runs `cargo test` on the on-chain-program crate, which has
+  # exactly one trivial macro-generated test (`test_id`, from Anchor's
+  # `declare_id!`) and no dependency on the Solana/Anchor CLI toolchain —
+  # confirmed by running `cargo test` with solana/anchor/avm stripped from
+  # PATH. It only needs a bare Rust toolchain (`install_rust`), not the full
+  # `install_anchor_toolchain` (Solana CLI + avm-built-from-source + pinned
+  # anchor-cli) that `on-chain-program-e2e` needs for `anchor test`.
   cargo-test:
     docker:
       - image: cimg/base:current
     steps:
       - checkout
-      - install_anchor_toolchain
+      - install_rust
       - run:
           name: cargo test
           working_directory: apps/on-chain-program
