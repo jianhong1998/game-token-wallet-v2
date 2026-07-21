@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Repo bootstrap: pnpm workspace, Anchor program, connection utility, and a full local/CI dev loop</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 780px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+  header { border-bottom: 2px solid #ccc; margin-bottom: 1.5rem; padding-bottom: 1rem; }
+  .badge { display: inline-block; background: #eee; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.85rem; margin-right: 0.5rem; }
+  section.area { margin: 2rem 0; padding-top: 1rem; border-top: 1px solid #ddd; }
+  .quiz { background: #f7f7f7; border-radius: 6px; padding: 1rem; margin-top: 1rem; }
+  .quiz details { margin: 0.75rem 0; }
+  .quiz summary { cursor: pointer; font-weight: 600; }
+  .quiz .answer { margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: #fff; border-left: 3px solid #888; }
+  ul.plain li { margin-bottom: 0.5rem; }
+  @media (prefers-color-scheme: dark) {
+    .badge { background: #3a3a3a; }
+    .quiz { background: #2a2a2a; }
+    .quiz .answer { background: #1e1e1e; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="badge">diff-review</span>
+  <span class="badge">feat/001-repo-bootstrap-connection-utility</span>
+  <span class="badge">2026-07-21</span>
+  <h1>Repo bootstrap: pnpm workspace, Anchor program, connection utility, and a full local/CI dev loop</h1>
+  <p>This branch creates the entire game-token-wallet-v2 repo from an empty shell: a pnpm workspace with an Anchor program, a Codama-generated TypeScript client, a Next.js frontend, and two real (not stubbed) e2e test apps, all wired together by a Docker Compose local-dev loop and a CircleCI pipeline. The functional payload is deliberately trivial (one <code>noop</code> instruction) — the point of the ticket is proving every layer of plumbing (env config to signer to RPC to on-chain program to UI to CI) actually works end-to-end, since every later ticket builds directly on top of this scaffold.</p>
+</header>
+
+<section>
+  <h2>Why</h2>
+  <p>This is ticket 001 of the project: before any real game/token logic can be written, the team needs a repo that installs, builds, tests, and deploys reproducibly — and a single, disciplined place where the server-side Solana connection and system-admin signer are constructed, since the whole product is custodial (users never touch a wallet or seed phrase; the server signs on their behalf). Getting that discipline right on day one matters more than the feature itself: every later ticket will import from this connection utility rather than each inventing its own RPC/signer construction.</p>
+  <p>The <code>noop</code> instruction is intentionally the simplest possible on-chain action (no accounts, no args, no logic) so this ticket can prove the full chain — Server Action calls the utility, the utility loads env and builds a signer, the signer submits through the Anchor-generated client, the transaction lands on a real (Surfpool) validator, and the resulting signature renders in the browser — without any product logic getting in the way of validating the scaffold itself. The design doc and plan record that most structural decisions (repo tree, tech stack, account model) were already settled in prior sessions; this ticket resolves the remaining implementation-level choices (env var shapes, exact tool versions, verification approach) needed to actually build it.</p>
+</section>
+
+<section class="area">
+  <h2>Root workspace scaffold and tooling</h2>
+  <p>The repo becomes a pnpm workspace (<code>pnpm-workspace.yaml</code>: <code>apps/*</code>, <code>packages/*</code>) with a root <code>package.json</code> exposing <code>lint</code>/<code>typecheck</code>/<code>test</code>/<code>build</code>/<code>codegen</code> scripts that fan out via <code>pnpm -r --if-present run &lt;script&gt;</code>. A shared <code>tsconfig.base.json</code>, a flat ESLint config (<code>eslint.config.mjs</code>), and Prettier config give every workspace package the same baseline instead of each reinventing it.</p>
+  <p>The <code>--if-present</code> fan-out has a sharp edge that review caught late (round 3): a package that simply lacks a <code>lint</code>/<code>typecheck</code> script is silently skipped rather than failing, so for most of the loop 3 of the 4 TypeScript packages had no real type-checking in CI even though the root script reported success. That was closed by giving every package its own <code>lint</code>/<code>typecheck</code> script (and a <code>tsconfig.json</code> for <code>apps/e2e</code>, which had none at all), turning a silent gap into an enforced one.</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>Why did <code>pnpm typecheck</code> report success for months of this diff's dev loop even though 3 of 4 TS packages had no real type-checking wired in?</summary>
+      <div class="answer"><strong>Because the root script uses <code>pnpm -r --if-present run typecheck</code>, which silently skips any package lacking that script rather than failing.</strong><br>Round-3 review (F5) found this let a real TS2345 type error ship undetected in <code>apps/on-chain-program-e2e</code>'s test — the fix was adding the missing scripts/tsconfig to every package, not changing the fan-out command.</div>
+    </details>
+    <details>
+      <summary>What ties a Server Action's env-var access to build safety, and what verification step in Task 5 depends on it?</summary>
+      <div class="answer"><strong><code>PROGRAM_ID</code>/<code>SYSTEM_ADMIN_SECRET_KEY</code> must only ever be read lazily inside the connection utility's singleton accessor, never at module import time — otherwise <code>pnpm --filter frontend run build</code> fails outright.</strong><br>Next.js evaluates modules reachable from a page at build time; reading required env vars at module scope (rather than inside a function called at request time) would throw during the production build before any request ever happens.</div>
+    </details>
+  </div>
+</section>
+
+<section class="area">
+  <h2>Anchor program skeleton (<code>game_token_wallet</code> + <code>noop</code>)</h2>
+  <p><code>apps/on-chain-program</code> is an Anchor 1.x program (chosen over the older 0.30.x line specifically because Anchor 1.0 made Surfpool/LiteSVM the default test backend, matching the already-chosen local-dev strategy) with a single crate <code>game_token_wallet</code> exposing one instruction, <code>noop</code>, that takes no accounts and no arguments and does nothing (<code>Ok(())</code>). The plan's own placeholder <code>declare_id!</code> was malformed (41 characters instead of a valid 32-byte pubkey) and had to be fixed just to get <code>anchor build</code> running before <code>anchor keys sync</code> overwrote it with the real generated address anyway.</p>
+  <p>Because <code>noop</code> has zero logic, the ticket deliberately does not write a contrived Rust unit test for it (a documented deviation from the original spec's §8) — instead <code>cargo test</code> passing with its one auto-generated <code>test_id</code> test (from the <code>declare_id!</code> macro) is treated as this task's gate, and the instruction's real coverage comes later from the on-chain integration test (Task 4) and the Playwright e2e test (Task 8), both of which invoke <code>noop</code> against a live validator.</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>Why doesn't this ticket ship a Rust unit test for the <code>noop</code> instruction, despite the original spec calling for one?</summary>
+      <div class="answer"><strong><code>noop</code>'s body is just <code>Ok(())</code> — a hand-written <code>Context&lt;Noop&gt;</code> unit test would be fake coverage for a checkbox; real coverage instead comes from live on-chain round-trip tests in Tasks 4 and 8.</strong><br>This was an explicit, flagged deviation recorded in the plan's Global Constraints, not an oversight — <code>cargo test</code> exiting 0 is treated as sufficient for this task alone.</div>
+    </details>
+    <details>
+      <summary>What is <code>test_id</code> and why does its presence matter to the CI story?</summary>
+      <div class="answer"><strong>It's a test auto-generated by Anchor's <code>declare_id!</code> macro (not hand-authored), and it's the one test that makes <code>cargo test</code> non-vacuous in the <code>cargo-test</code> CI job.</strong><br>decisions.md notes this ran unexpectedly (the plan assumed 0 tests) and was accepted as part of the passing gate rather than treated as a discrepancy to chase.</div>
+    </details>
+  </div>
+</section>
+
+<section class="area">
+  <h2>Codama codegen (<code>packages/on-chain-client</code>)</h2>
+  <p>Rather than hand-writing a TypeScript client for the Anchor program, <code>packages/on-chain-client</code> runs Codama (<code>@codama/nodes-from-anchor</code> + <code>@codama/renderers-js</code>) against the built IDL (<code>apps/on-chain-program/target/idl/game_token_wallet.json</code>) to generate <code>getNoopInstruction</code> and a <code>GAME_TOKEN_WALLET_PROGRAM_ADDRESS</code> constant. The generated output under <code>src/generated/</code> is committed to git rather than gitignored — a deliberate call to sidestep Docker build-ordering problems between the program-deploy step and the frontend image build (the frontend image can't wait on a sibling container's codegen step during its own build).</p>
+  <p>A real signature mismatch surfaced during implementation: the plan assumed <code>getNoopInstruction(input, config)</code> (two arguments), but the actual generated function takes a single config object, <code>getNoopInstruction({ programAddress })</code>. This was caught in Task 3 and had to be threaded through as a fix in both Task 4's on-chain test and Task 7's Server Action, since both call sites had copied the plan's stale example.</p>
+  <p>The unit test for this package (<code>src/index.test.ts</code>, checking that the export is a function and the program-address constant is a non-empty string) was itself dead code for most of the loop — round 1 (F1) found neither CircleCI nor the Justfile ever invoked <code>pnpm --filter on-chain-client run test</code>, so a real, committed test suite simply never ran. It was wired into CI's <code>web-unit-tests</code> job and the Justfile's <code>test</code> recipe.</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>Why is <code>packages/on-chain-client/src/generated/</code> committed to git instead of being gitignored like a typical build artifact?</summary>
+      <div class="answer"><strong>To avoid a Docker build-ordering dependency between the program-deploy container (which runs codegen) and the frontend image build, which needs the generated client to already exist.</strong><br>Global Constraints in the plan state this explicitly — committing sidesteps having the frontend's Docker build wait on or reach into another container's output.</div>
+    </details>
+    <details>
+      <summary>What real bug did round-1 code review find about this package's own test suite, and how was it fixed?</summary>
+      <div class="answer"><strong>Its vitest suite was never executed by CI or the Justfile — only the frontend's tests were run. Fixed by adding <code>pnpm --filter on-chain-client run test</code> to both CircleCI's <code>web-unit-tests</code> job and the Justfile.</strong><br>F1 in round-1.md — the fix explicitly avoided broadening to a blind <code>pnpm -r</code> fan-out, since that would have also fired the infra-dependent <code>on-chain-program-e2e</code>/<code>e2e</code> suites standalone, which can't pass without a live validator.</div>
+    </details>
+    <details>
+      <summary>What discrepancy between the plan and the real generated code had to be fixed in two downstream call sites?</summary>
+      <div class="answer"><strong>The plan assumed <code>getNoopInstruction(input, config)</code> (two args); the real Codama-generated signature is a single config object, <code>getNoopInstruction({ programAddress })</code>.</strong><br>Confirmed in Task 3 by reading the actual generated file rather than trusting the plan's guessed shape; the fix had to be propagated into Task 4's e2e test and Task 7's Server Action.</div>
+    </details>
+  </div>
+</section>
+
+<section class="area">
+  <h2>Connection/signer utility (<code>apps/frontend/src/server/</code>) — the ticket's core deliverable</h2>
+  <p><code>env.ts</code> (<code>loadSolanaEnv</code>) reads four required env vars (<code>SOLANA_CLUSTER</code>, <code>SOLANA_RPC_URL</code>, <code>PROGRAM_ID</code>, <code>SYSTEM_ADMIN_SECRET_KEY</code>) with no silent fallback — any missing or unrecognized value throws immediately with a specific message naming the offending var. <code>connection.ts</code> (<code>getSolanaContext</code>) builds on top of that: it decodes the base58 admin secret key, validates it decodes to exactly 64 bytes (rejecting silently-wrong keys rather than constructing a garbage signer), and memoizes the resulting <code>{ rpc, rpcSubscriptions, adminSigner, programAddress }</code> context in a module-level promise so it's built exactly once per process and reused thereafter. This file is the only place in the codebase permitted to construct an RPC client or signer — every other server module (Server Actions, future instruction wrappers) must import from here.</p>
+  <p>Both files were built TDD-first: failing tests were written before the implementation for both the happy path and edge cases (missing var, malformed secret key, invalid cluster name, and — for the connection utility — that repeated calls return the identical object reference, proving the singleton). One bug surfaced in the plan's own fixtures during this task: the literal 41-character <code>PROGRAM_ID</code> placeholder used in the tests didn't decode to a valid 32-byte pubkey — <code>connection.test.ts</code>'s real address-decoding assertion caught it where <code>env.test.ts</code>'s non-decoding <code>toEqual</code> comparison didn't, and both test files were corrected. The implementation code itself matched the plan verbatim.</p>
+  <p>A real library gap also had to be worked around here rather than papered over: <code>@solana/kit@5.5.1</code>'s <code>signTransactionMessageWithSigners</code> returns a non-generic <code>TransactionWithLifetime</code>, which isn't assignable to what <code>sendAndConfirmTransactionFactory</code> expects. Rather than an <code>as</code> cast (which would lie to the type system), the code calls <code>assertIsTransactionWithBlockhashLifetime</code> — a documented runtime type-guard from the library itself — to narrow the type by actually checking it at runtime.</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>What four env vars does <code>loadSolanaEnv</code> require, and what happens if <code>SOLANA_CLUSTER</code> is set to "testnet"?</summary>
+      <div class="answer"><strong><code>SOLANA_CLUSTER</code>, <code>SOLANA_RPC_URL</code>, <code>PROGRAM_ID</code>, <code>SYSTEM_ADMIN_SECRET_KEY</code> — all required with no defaults; <code>SOLANA_CLUSTER=testnet</code> throws because only <code>localnet | devnet | mainnet-beta</code> are recognized.</strong><br><code>env.ts</code>'s <code>CLUSTERS</code> constant is the enum; <code>loadSolanaEnv</code> throws <code>Invalid SOLANA_CLUSTER "..."</code> for any other value, matching <code>env.test.ts</code>'s corresponding test.</div>
+    </details>
+    <details>
+      <summary>Why does <code>getSolanaContext()</code> memoize a <code>Promise&lt;SolanaContext&gt;</code> rather than a resolved <code>SolanaContext</code>?</summary>
+      <div class="answer"><strong>Because building the context requires an async step (<code>createKeyPairSignerFromBytes</code>), so the singleton has to cache the in-flight promise — caching only after resolution would let concurrent early callers race and build the context twice.</strong><br><code>connection.ts</code> sets <code>contextPromise = createContext()</code> synchronously on first call, before awaiting anything, so every caller (even concurrent ones) gets the same promise instance.</div>
+    </details>
+    <details>
+      <summary>What real problem does decoding-and-length-checking the admin secret key protect against, and which test file's assertion actually exercises pubkey decoding versus which one doesn't?</summary>
+      <div class="answer"><strong>It protects against silently constructing a garbage signer from a malformed key. <code>connection.test.ts</code> actually decodes the address (<code>address(env.programId)</code>), which is what caught the plan's invalid 41-character placeholder pubkey; <code>env.test.ts</code>'s <code>toEqual</code> on the raw string didn't.</strong><br>decisions.md (task-6) documents this exact discrepancy: the implementation was correct as planned, but the plan's own test fixture data had a bug only one of the two test files was capable of catching.</div>
+    </details>
+    <details>
+      <summary>Why does <code>sendNoopTransaction</code> (and the on-chain-program-e2e test) call <code>assertIsTransactionWithBlockhashLifetime</code> instead of casting the signed transaction's type?</summary>
+      <div class="answer"><strong><code>signTransactionMessageWithSigners</code> returns a non-generic <code>TransactionWithLifetime</code> type that doesn't statically satisfy <code>sendAndConfirmTransactionFactory</code>'s required blockhash-lifetime type, and a cast would silently hide a real mismatch; the assertion performs an actual runtime check instead.</strong><br>This is a genuine <code>@solana/kit@5.5.1</code> type gap, independently reproduced against already-committed code before being accepted as a library issue rather than implementer error (task-7 decisions).</div>
+    </details>
+  </div>
+</section>
+
+<section class="area">
+  <h2><code>noop</code> Server Action, proof-of-plumbing page, and the two e2e skeleton apps</h2>
+  <p><code>apps/frontend/src/server/actions/noop.ts</code> is a <code>"use server"</code> Server Action (<code>sendNoopTransaction</code>) that pulls the memoized context from <code>getSolanaContext()</code>, builds a versioned transaction with the generated <code>getNoopInstruction</code>, signs it with the admin signer, sends and confirms it, and returns the resulting signature. <code>apps/frontend/src/app/page.tsx</code> is a client component with one button that calls this action and displays either the returned signature or the error message — this is deliberately the whole UI for this ticket, since the goal is proving the wiring, not building product UI.</p>
+  <p>Two separate 'leaf' test apps exercise <code>noop</code> for real rather than being placeholder CI stanzas: <code>apps/on-chain-program-e2e</code> is a vitest suite invoked by <code>anchor test</code> (via <code>Anchor.toml</code>'s <code>[scripts] test</code>) that airdrops SOL, builds a transaction with the generated client, and confirms it against the validator Anchor itself spins up. <code>apps/e2e</code> is a Playwright test that drives the actual running frontend through the browser — navigates to <code>/</code>, clicks the button, and asserts a valid-looking base58 signature renders. Both give this trivial instruction genuine, non-vacuous coverage across two different layers (program-level and full-stack-through-the-browser).</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>Why does <code>apps/on-chain-program-e2e</code>'s test exist separately from <code>apps/e2e</code>'s Playwright test if both ultimately exercise <code>noop</code>?</summary>
+      <div class="answer"><strong>They test different layers: <code>on-chain-program-e2e</code> proves the program + generated client work correctly against a live validator at the transaction-construction level; <code>apps/e2e</code> proves the entire user-facing path (browser click through Server Action through connection utility through chain) works.</strong><br>Design doc §4/§5 and the plan's Task 4/Task 8 descriptions frame these as intentionally distinct verification surfaces, not redundant tests.</div>
+    </details>
+    <details>
+      <summary>What does the proof-of-plumbing page display when <code>sendNoopTransaction</code> throws, and how does the Playwright test's assertion differ from what a real production error page would need?</summary>
+      <div class="answer"><strong>The page catches the error and renders it in a <code>data-testid="noop-error"</code> element; the Playwright test only asserts on the success path (<code>noop-signature</code>) with a regex matching a base58 signature.</strong><br><code>page.tsx</code>'s <code>handleClick</code> sets <code>error</code> state in the catch branch, but <code>apps/e2e/tests/noop.spec.ts</code> only exercises and asserts the happy path — there's no e2e coverage of the error-rendering branch in this ticket.</div>
+    </details>
+  </div>
+</section>
+
+<section class="area">
+  <h2>Local Docker dev loop and the program-deploy-keypair reproducibility bug</h2>
+  <p><code>docker-compose.yml</code> is the single local entry point (<code>just dev-up</code>): <code>surfpool</code> (a pinned-by-digest validator image) becomes healthy, <code>program-deploy</code> (a one-shot Anchor build+deploy+codegen container) runs to completion, then <code>frontend</code> boots against the deployed program. Getting the <code>program-deploy</code> image working at all required abandoning the plan's assumptions: the original <code>debian:bookworm-slim</code> base couldn't work on Apple Silicon because neither Solana CLI nor Anchor CLI publish linux/arm64 binaries, so the image is forced to <code>platform: linux/amd64</code>; the plan's one-line mega-installer script panicked with no TTY in Docker, so it was replaced with explicit rustup/Solana-installer/<code>cargo install avm</code> steps; and the base image had to move from <code>bookworm</code> to <code>trixie</code> because anchor-cli 1.1.2's prebuilt binary needs a newer glibc than bookworm ships. Named Docker volumes were also added to isolate each workspace package's <code>node_modules</code>, because a host (arm64) and container (amd64) both writing into the same bind-mounted <code>node_modules</code> corrupted native binaries badly enough to crash a live dev server mid-request.</p>
+  <p>The most significant bug in the whole diff surfaced only during live re-verification, after the rest of the stack looked done: the program's deployed identity depended on a gitignored, host-mutable file, <code>target/deploy/game_token_wallet-keypair.json</code>. Whenever that file went missing (a fresh clone, or another <code>anchor build</code> run elsewhere on the same host — which had actually happened across the many agent runs sharing this host's checkout), Anchor silently minted a brand-new random keypair and the deployed program's address quietly drifted out of sync with the <code>declare_id!</code>/<code>Anchor.toml</code>/<code>PROGRAM_ID</code> values already committed to source. The fix commits a fixed, throwaway, non-secret keypair (<code>docker/local/fixtures/game_token_wallet-keypair.dev.json</code>, address <code>FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t</code>), which the Dockerfile/compose command now seeds into <code>target/deploy/</code> before every <code>anchor build</code> runs — the same "commit a throwaway dev secret" pattern already used for <code>SYSTEM_ADMIN_SECRET_KEY</code>. It was proven reproducible by deleting the local keypair and rebuilding fresh (same address every time) and independently re-confirmed by a separate verifier agent submitting a real on-chain transaction.</p>
+  <p>A second, smaller funding bug was also found and fixed here: the plan only airdropped SOL to the container's own ephemeral CLI keypair, leaving the actual <code>SYSTEM_ADMIN_SECRET_KEY</code> fee-payer wallet unfunded — every <code>noop</code> transaction from the frontend would fail with "no record of a prior credit." The fix adds a second <code>solana airdrop</code> targeting that specific wallet address.</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>What was the root cause of the program-deploy-keypair reproducibility bug, and why did it only surface during live re-verification rather than during initial implementation?</summary>
+      <div class="answer"><strong><code>target/deploy/game_token_wallet-keypair.json</code> (the file that actually determines the deployed program's address) was gitignored and host-mutable; whenever it went missing, <code>anchor build</code> silently generated a new random keypair, drifting the real deployed address away from the committed <code>declare_id!</code>/<code>Anchor.toml</code>/<code>PROGRAM_ID</code> values. It surfaced only on re-verification because the drift had actually happened across multiple agent runs sharing one host's checkout, not because of anything wrong in a single run's logic.</strong><br>decisions.md's "Review fixes" section frames this as a verification-failure fix (not a review-round finding) — caught by observing a live re-verify, not by reading code.</div>
+    </details>
+    <details>
+      <summary>How was the keypair reproducibility fix verified as actually correct, not just plausible?</summary>
+      <div class="answer"><strong>The local keypair file was deleted and the stack rebuilt from scratch, producing the identical deployed address every time, and a separate verifier agent independently confirmed it by submitting a real on-chain transaction.</strong><br>summary.md and decisions.md both describe this as a two-part proof: reproducibility across rebuilds, plus independent re-confirmation by a separate agent rather than trusting the same agent's own claim.</div>
+    </details>
+    <details>
+      <summary>Why was <code>docker-compose.yml</code>'s <code>program-deploy</code>/<code>frontend</code> forced to <code>platform: linux/amd64</code>, and what secondary problem did that force create?</summary>
+      <div class="answer"><strong>Neither the Solana CLI nor anchor-cli publish linux/arm64 prebuilt binaries, so amd64 (transparently emulated on Apple Silicon) is required to use prebuilt binaries at all. This created a node_modules corruption problem when the host (arm64) and container (amd64) both ran <code>pnpm install</code> against the same bind-mounted directory, fixed by giving each workspace package its own named Docker volume.</strong><br>Documented directly in <code>docker/local/Dockerfile.anchor</code>'s and <code>docker-compose.yml</code>'s comments, and in task-9's "Challenges faced" in decisions.md.</div>
+    </details>
+    <details>
+      <summary>Besides the deploy keypair, what second funding-related bug did the local dev loop expose, and how was it fixed?</summary>
+      <div class="answer"><strong>The plan only airdropped SOL to the container's own throwaway CLI keypair, not to the <code>SYSTEM_ADMIN_SECRET_KEY</code> wallet that actually pays for <code>noop</code> transactions from the frontend — fixed by adding a second <code>solana airdrop</code> call targeting that specific address.</strong><br>task-9 decisions.md: "the plan only funded the container's own ephemeral CLI keypair, leaving the actual transaction fee-payer unfunded" — visible today as the second airdrop line in <code>docker/local/Dockerfile.anchor</code>'s CMD and <code>docker-compose.e2e.yml</code>'s command.</div>
+    </details>
+  </div>
+</section>
+
+<section class="area">
+  <h2>CI-parity e2e stack (<code>docker-compose.e2e.yml</code>)</h2>
+  <p>This is a second, prod-parity compose stack reusing <code>docker/local/Dockerfile.anchor</code> as-is but building the frontend from a real multi-stage production Dockerfile (<code>docker/deployment/Dockerfile</code>) instead of the local dev image, and adding a fourth service, <code>e2e</code>, that runs the Playwright suite in a container against that prod-built frontend. This is exactly the command CircleCI's <code>e2e</code> job runs.</p>
+  <p>Getting this stack to actually finish required working around a real Docker Compose limitation, not an application bug: <code>--abort-on-container-exit</code> (needed so the overall <code>docker compose up</code> command exits with the test's real pass/fail code) tears down the <em>entire</em> stack the instant <em>any</em> container exits — including <code>program-deploy</code>, which is supposed to exit 0 on success. The original one-shot design reproducibly tore down <code>surfpool</code> mid-flight before <code>frontend</code>/<code>e2e</code> could even start, failing with "getaddrinfo ENOTFOUND surfpool." The fix keeps <code>program-deploy</code> alive forever after finishing its real work (<code>tail -f /dev/null</code>) and signals completion via a marker file plus a healthcheck, so <code>frontend</code>'s <code>depends_on: condition: service_healthy</code> can gate on it without anything ever exiting early. A <code>profiles:</code>-based alternative was tried first and rejected because <code>docker compose config</code> didn't accept it. A production Dockerfile bug was also found on the first attempt: it omitted <code>COPY tsconfig.base.json</code>, breaking Turbopack's tsconfig resolution during the prod build.</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>Why can't <code>program-deploy</code> simply exit 0 after finishing its build/deploy/codegen work in this compose file, even though that's exactly what it does in the plain <code>docker-compose.yml</code>?</summary>
+      <div class="answer"><strong>Because this stack is run with <code>--abort-on-container-exit --exit-code-from e2e</code>, and Compose's <code>--abort-on-container-exit</code> tears down every other container the moment ANY explicit container exits — even a one-shot dependency that exited 0 on purpose — which reproducibly killed <code>surfpool</code> before <code>frontend</code>/<code>e2e</code> could run.</strong><br>docker-compose.e2e.yml's inline comment cites this as a documented Compose limitation (linked GitHub issues docker/compose#10233, #13223), confirmed empirically in Task 10, not something fixable by changing <code>program-deploy</code>'s own script.</div>
+    </details>
+    <details>
+      <summary>How does <code>frontend</code> know <code>program-deploy</code> has actually finished, given that <code>program-deploy</code> never exits in this file?</summary>
+      <div class="answer"><strong><code>program-deploy</code> touches a marker file (<code>/tmp/deploy-complete</code>) after its real work finishes, and its healthcheck polls for that file's existence; <code>frontend</code>'s <code>depends_on: program-deploy: condition: service_healthy</code> gates on that healthcheck instead of <code>service_completed_successfully</code>.</strong><br>Visible directly in <code>docker-compose.e2e.yml</code>: <code>command</code> ends with <code>touch /tmp/deploy-complete &amp;&amp; tail -f /dev/null</code>, and the healthcheck is <code>test -f /tmp/deploy-complete</code>.</div>
+    </details>
+    <details>
+      <summary>What real bug did the first attempt at <code>docker/deployment/Dockerfile</code> (the production frontend image) have?</summary>
+      <div class="answer"><strong>It omitted <code>COPY tsconfig.base.json</code>, which broke the Turbopack build with a tsconfig resolution error, since the frontend's own tsconfig extends the root one.</strong><br>Recorded as Attempt 1's failure in task-10's "Challenges faced" in decisions.md.</div>
+    </details>
+  </div>
+</section>
+
+<section class="area">
+  <h2>CircleCI pipeline</h2>
+  <p><code>.circleci/config.yml</code> defines six real jobs on every PR (no fast-PR/slow-main split, per an earlier project decision): <code>lint</code>, <code>typecheck</code>, <code>web-unit-tests</code> (frontend + on-chain-client vitest suites), <code>cargo-test</code>, <code>on-chain-program-e2e</code> (real <code>anchor test</code> against a live validator), and <code>e2e</code> (the full <code>docker-compose.e2e.yml</code> stack). Toolchain installation is factored into two shared CircleCI <code>commands:</code> blocks — <code>install_rust</code> (bare rustup, used by <code>cargo-test</code>) and <code>install_anchor_toolchain</code> (rustup + Solana CLI + <code>avm</code>-built-from-source + pinned anchor-cli 1.1.2, used by <code>on-chain-program-e2e</code>) — split apart because <code>cargo-test</code> was confirmed to need no Solana/Anchor CLI dependency at all (verified by running <code>cargo test</code> with <code>solana</code>/<code>anchor</code>/<code>avm</code> stripped from PATH).</p>
+  <p>A real, if narrow, correctness gap review caught: <code>cargo-test</code>'s job initially installed the full toolchain for a job that never touches it (round 1, F4) — trimmed to the minimal <code>install_rust</code>. A follow-on defect from that very fix then had to be caught in round 2 (F1): a comment justifying tolerating <code>cimg/base:current</code>'s floating tag via "anchor-cli's GLIBC_2.39+ requirement" was left in place even after the fix removed anchor-cli from that job entirely, so the comment's own stated rationale had become false — it was rewritten to match the corrected job.</p>
+
+  <div class="quiz">
+    <h3>Self-check</h3>
+    <details>
+      <summary>Why does <code>cargo-test</code> use <code>install_rust</code> while <code>on-chain-program-e2e</code> uses the larger <code>install_anchor_toolchain</code>, even though both jobs work with the same on-chain program code?</summary>
+      <div class="answer"><strong><code>cargo-test</code> only runs <code>cargo test</code> on the pure-Rust crate, confirmed (by stripping solana/anchor/avm from PATH) to need nothing beyond a Rust toolchain; <code>on-chain-program-e2e</code> runs <code>anchor test</code> against a real validator, which genuinely needs the Solana CLI and a pinned anchor-cli.</strong><br>Round-1 finding F4 identified the original <code>cargo-test</code> job as installing the full toolchain for zero benefit; the fix split the shared commands so each job installs only what it provably uses.</div>
+    </details>
+    <details>
+      <summary>What kind of bug did round 2 catch that round 1's own fix had introduced, and why is it a useful example of why review kept iterating instead of stopping after round 1?</summary>
+      <div class="answer"><strong>A stale comment: after F4 (round 1) removed the Anchor/Solana toolchain dependency from <code>cargo-test</code>, a comment justifying <code>cimg/base:current</code>'s floating-tag risk via anchor-cli's GLIBC_2.39+ requirement was left behind, now contradicting the job it described.</strong><br>Round-2 F1 — illustrates that fixing one finding can leave stale artifacts (comments, in this case) that only a further review pass catches; this is why the loop ran 4 rounds rather than exiting after round 1's fixes.</div>
+    </details>
+  </div>
+</section>
+
+<section>
+  <h2>Challenges &amp; decisions</h2>
+  <ul class="plain">
+    <li>Q1-Q8 in the design doc pre-resolved: SYSTEM_ADMIN_SECRET_KEY as a single base58 string (simplest CI/docker secret injection), SOLANA_CLUSTER + always-required explicit SOLANA_RPC_URL (avoids silent fallback to rate-limited public endpoints), noop proven via a real Server Action + page (only way to prove the full path works, not just that Rust compiles), on-chain-program-e2e/e2e built as real minimal apps rather than placeholder CI stanzas, Anchor 1.x chosen over 0.30.x since Surfpool/LiteSVM became the native default test backend.</li>
+    <li>Fixed a malformed placeholder pubkey in the plan's own declare_id! example (41 characters, not a valid 32-byte pubkey) — anchor build failed immediately otherwise; inert once anchor keys sync overwrote it.</li>
+    <li>Fixed a path bug in the plan's literal generate-client.mjs script (pointed at a nonexistent packages/on-chain-program/... path instead of apps/on-chain-program/...).</li>
+    <li>Added allowBuilds: { esbuild: true } to pnpm-workspace.yaml — pnpm 11.15.1 blocks esbuild's postinstall script by default, which broke every filtered pnpm command until fixed at the environment level.</li>
+    <li>Discovered the real Codama-generated getNoopInstruction signature (single config object) diverges from the plan's imagined two-arg form — propagated the fix into Task 4's on-chain test and Task 7's Server Action.</li>
+    <li>Fixed the plan's own test fixture bug in connection/env tests: a 41-character PROGRAM_ID placeholder didn't decode to a valid pubkey; connection.test.ts's real decoding assertion caught what env.test.ts's non-decoding comparison missed.</li>
+    <li>Used @solana/kit's own assertIsTransactionWithBlockhashLifetime runtime type-guard rather than an `as` cast to resolve a genuine library type gap (signTransactionMessageWithSigners returns a non-generic TransactionWithLifetime) — chosen specifically to avoid lying to the type system.</li>
+    <li>Dropped the plan's mega-installer script entirely inside Docker (panics with no TTY; never sources NVM into later layers) in favor of explicit rustup/official-installer/cargo-install-avm steps.</li>
+    <li>Forced platform: linux/amd64 for program-deploy/frontend after confirming via GitHub Releases that neither Agave nor Anchor v1.1.2 publish linux/arm64 binaries.</li>
+    <li>Switched base image from node:24.18.0-bookworm to -trixie because anchor-cli 1.1.2's prebuilt binary requires GLIBC_2.39+, which bookworm's 2.36 doesn't provide.</li>
+    <li>Added 5 named Docker volumes to isolate node_modules per workspace package after cross-platform (host arm64 / container amd64) pnpm installs corrupted native binaries badly enough to crash a live Next.js dev server mid-request.</li>
+    <li>Root-caused and fixed the program-deploy-keypair reproducibility bug: committed a fixed throwaway deploy keypair (docker/local/fixtures/game_token_wallet-keypair.dev.json) seeded into target/deploy/ before every build, replacing a gitignored keypair that silently regenerated (and had actually drifted) across agent runs sharing one host's checkout — proven via delete-and-rebuild reproducibility plus independent re-confirmation by a separate verifier agent on a real on-chain transaction.</li>
+    <li>Added a second solana airdrop targeting the SYSTEM_ADMIN_SECRET_KEY wallet address after discovering the plan only funded the container's own ephemeral CLI keypair, leaving the actual transaction fee-payer unfunded.</li>
+    <li>Chose a long-lived program-deploy container (tail -f /dev/null + marker-file healthcheck) over a profiles:-based alternative (tried first, rejected by docker compose config) to work around Compose's --abort-on-container-exit tearing down the whole stack on the first container exit.</li>
+    <li>Factored CircleCI's Anchor/Solana toolchain install into shared install_rust / install_anchor_toolchain commands, split apart after confirming cargo-test genuinely needs no Solana/Anchor CLI dependency (verified by stripping solana/anchor/avm from PATH and re-running cargo test).</li>
+    <li>Caught and fixed a stale CI comment (round 2) whose stated rationale (anchor-cli's GLIBC requirement) no longer applied after round 1's own fix removed that toolchain dependency from the job it described.</li>
+    <li>Caught and fixed a real, presently-shipping TS2345 type error (round 3) that had shipped undetected because typecheck/lint silently no-op'd for 3 of 4 TypeScript packages under pnpm's --if-present fan-out — wired real scripts into all remaining packages rather than leaving the gap.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Known risks &amp; deferred items</h2>
+  <ul class="plain">
+    <li>.gitignore's <code>!apps/on-chain-program/target/idl/</code> negation is a no-op — git cannot re-include a path under an already-excluded parent directory; harmless today, inherited from the plan.</li>
+    <li>docker-compose.yml and docker-compose.e2e.yml duplicate the surfpool service config and dev-fixture literals (PROGRAM_ID, SYSTEM_ADMIN_SECRET_KEY) verbatim with no shared base — future edits to one could silently drift from the other.</li>
+    <li>The keypair-seed + build + deploy + codegen pipeline is duplicated between Dockerfile.anchor's CMD and docker-compose.e2e.yml's command override.</li>
+    <li>No CircleCI caching (pnpm store, cargo registry, toolchain installs) — cost/time only, not correctness.</li>
+    <li>Repeated pnpm-setup boilerplate copy-pasted across 4 CircleCI jobs instead of using the file's own established shared <code>command:</code> pattern.</li>
+    <li>web-unit-tests CI job serializes two independent test suites (frontend, on-chain-client) in one job instead of splitting into parallel jobs, inconsistent with how cargo-test/on-chain-program-e2e are split.</li>
+    <li>apps/on-chain-program-e2e's test hardcodes RPC/WS URL literals (8899/8900) duplicating the convention connection.ts's deriveWsUrl() already centralizes.</li>
+    <li>setValidEnv() test helper is duplicated verbatim across env.test.ts and connection.test.ts.</li>
+    <li>Noop transaction-assembly logic is duplicated between the production Server Action (noop.ts) and the on-chain-program-e2e test instead of a shared on-chain-client helper.</li>
+    <li>deriveWsUrl() infers the WS port via a magic-number match on 8899 rather than an explicit SOLANA_WS_URL env var, inconsistent with the project's "always explicit" precedent set for SOLANA_RPC_URL.</li>
+    <li>docker-compose.e2e.yml's tail -f /dev/null + marker-file healthcheck is a deliberate, already-discussed workaround for a Compose limitation (--abort-on-container-exit tearing down the stack on any container exit), not a defect, but is a nonstandard pattern a future reader may not expect.</li>
+    <li>The two sequential solana airdrop calls in Dockerfile.anchor/docker-compose.e2e.yml could run concurrently instead of serially — minor time cost only.</li>
+    <li>Justfile's test recipe fully serializes independent suites (cargo test, frontend vitest, on-chain-client vitest, anchor test, e2e compose) even though CI already parallelizes the equivalent jobs.</li>
+    <li>Root package.json's "test" script is dead code — never invoked by CI or Justfile, and would break if run standalone since it would fire infra-dependent e2e suites with no live stack behind them.</li>
+    <li>apps/on-chain-program-e2e/package.json has no @types/node despite using process.env/node builtins — a silent type gap since no typecheck script was wired for it during most of the loop (later partially addressed alongside the round-3 typecheck fix, but flagged rather than silently added as an unlisted dependency per project rules on flagging new deps).</li>
+  </ul>
+</section>
+
+</body>
+</html>

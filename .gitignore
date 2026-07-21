@@ -22,3 +22,6 @@ target/
 
 # Logs
 *.log
+
+# Playwright MCP scratch output (console/page snapshots from browser-tool verification runs)
+.playwright-mcp/
