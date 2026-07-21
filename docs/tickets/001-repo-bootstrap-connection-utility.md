@@ -8,6 +8,6 @@
 
 - [ ] New repo initialized: Next.js (app router) + TypeScript + TanStack React Query + React Context scaffolding, plus an Anchor program skeleton building successfully via `anchor build`.
 - [ ] A connection/signer utility reads the cluster type/provider and the system admin wallet keypair from environment variables, and exposes a lazy singleton Program/Connection accessor — all server-side code goes through it, nothing else constructs a `Connection`/`Program` directly.
-- [ ] CI pipeline runs lint, typecheck, `anchor test`, and web unit tests on every PR.
+- [ ] CI pipeline runs lint, typecheck, `cargo test` (on-chain-program unit tests), and web unit tests on every PR. (Integration-level `on-chain-program-e2e` and browser `e2e` (Playwright) suites land once those apps exist — see [codebase-structure/002-decisions.md](../technical-related/codebase-structure/002-decisions.md) Q10–Q12 — but the CI job structure for them should be scaffolded here too.)
 - [ ] Local dev loop works end to end: a local validator + client can be brought up via docker compose, the program deploys locally, and the app boots against it.
 - [ ] No functional Solana instructions exist yet beyond a trivial no-op used to prove the plumbing works.

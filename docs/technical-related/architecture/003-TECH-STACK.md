@@ -86,9 +86,13 @@ system_admin_pubkey]`, stores the hashed login password.
 
 ## CI/CD & Deployment
 
-- **CircleCI** pipeline: lint, typecheck, `anchor test`, web unit tests run
-  on every PR (ticket 001). Devnet-deploy job exists (ticket 004); whether
-  it's automatic on merge or manually gated is still undecided (see
+- **CircleCI** pipeline: lint, typecheck, `cargo test` (on-chain-program
+  unit tests), `on-chain-program-e2e` (Anchor integration tests), `e2e`
+  (Playwright), and frontend unit tests all run on every PR — one CI bar, no
+  fast-PR/slow-main split (see
+  [codebase-structure/002-decisions.md](../codebase-structure/002-decisions.md)
+  Q10–Q12). Devnet-deploy job exists (ticket 004); whether it's automatic on
+  merge or manually gated is still undecided (see
   [002-pending-discussion.md](../../business-related/002-pending-discussion.md)).
 - **Client app**: Docker image, self-hosted, all config read at container
   runtime — nothing environment-specific baked in at build time.
@@ -101,12 +105,18 @@ system_admin_pubkey]`, stores the hashed login password.
 
 ## Testing
 
-- On-chain program: `anchor test`.
+- On-chain program unit tests: inline `#[cfg(test)] mod tests` per file, run
+  via plain `cargo test` — no validator or Surfpool needed (pure logic like
+  side-pot math, odd-chip remainder calculation).
+- On-chain program integration tests: `apps/on-chain-program-e2e`, run via
+  `anchor test`, consuming the generated `packages/on-chain-client` (same
+  client the frontend uses).
 - Web app: unit tests (vitest, per PRD/ticket references — exact runner to
-  confirm when ticket 001 lands).
-- No end-to-end test framework specified yet beyond the devnet smoke test in
-  ticket 004 (register + login against the live deployment through the
-  Dockerized app).
+  confirm when ticket 001 lands), colocated with source files.
+- Browser end-to-end: `apps/e2e` (Playwright), driving the frontend against
+  the prod-built Docker stack (`docker-compose.e2e.yml`), plus the devnet
+  smoke test in ticket 004 (register + login against the live deployment
+  through the Dockerized app).
 
 ## Open / Unconfirmed
 

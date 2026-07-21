@@ -7,7 +7,7 @@ Game Token Wallet V2 is a mobile-first Solana wallet dApp that lets non-Web3-sav
 - Users register with just a username/password (no wallet/seed phrase); a Solana PDA acts as their wallet, derived from a fee-payer + username.
 - A game creator becomes admin of a per-game SPL token; players join public or password-protected private games (max 20 players) and transfer tokens per one of three modes: general P2P transfer, Holdem-style pooled showdown, or general pool with admin-controlled payouts.
 - Admins manually mint/airdrop tokens when players deposit cash offline; tokens burn on account deletion, game quit, or game close.
-- Everything (users, games, balances) lives on-chain — no off-chain DB — via a custom Anchor program, with a self-hosted Next.js/TS client (server holds the admin signing wallet) so the whole stack is multi-tenant: anyone can host their own client + admin wallet against the same program.
+- Everything (users, games, balances) lives on-chain — no off-chain DB — via a custom Anchor program, with a self-hosted Next.js/TS client (server holds the single system admin signing wallet for that deployment). Multi-tenancy was dropped: anyone wanting their own instance self-hosts a separate client + admin wallet against their own program deployment, not a shared one (see architecture decision Q3).
 - Deployed to devnet via CircleCI; program ID and RPC URL are env-configurable rather than hardcoded.
 
 Note: [002-pending-discussion.md](docs/business-related/002-pending-discussion.md) flags several unresolved items (password hashing algorithm, session mechanics, deposit/mint conversion rate, numeric caps for account sizing) that haven't been finalized yet.
