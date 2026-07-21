@@ -7,3 +7,11 @@ init:
 
 help:
   @just -l
+
+[group: 'CI']
+lint:
+  @pnpm lint
+
+[group: 'CI']
+typecheck:
+  @pnpm typecheck

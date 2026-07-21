@@ -12,3 +12,12 @@ temp
 .env
 .env*.local
 !.env.template
+
+# Build outputs
+.next/
+dist/
+target/
+!apps/on-chain-program/target/idl/
+
+# Logs
+*.log
