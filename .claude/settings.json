@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "defaultMode": "auto",
+    "deny": ["Read(**/.env)"]
+  },
+  "model": "sonnet[1m]",
+  "effortLevel": "high"
+}
