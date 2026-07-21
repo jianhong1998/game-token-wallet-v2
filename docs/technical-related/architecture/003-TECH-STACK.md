@@ -16,6 +16,7 @@ on-chain patterns (PDA seed conventions, `close_*` rent-reclaim style).
 | Language            | TypeScript                                                     |
 | Server state        | TanStack React Query                                           |
 | Client/shared state | React Context                                                  |
+| Styling             | Tailwind CSS v4                                                |
 | Design              | Mobile-first; desktop capped to mobile width with side margins |
 
 - The client has **no wallet-connect flow and no client-side signing key**.
