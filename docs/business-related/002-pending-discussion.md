@@ -12,7 +12,7 @@ PRD says CircleCI, docker self-hosted (env vars not baked at build time),
 devnet deploy with env-controlled program ID. Not yet discussed:
 
 - Pipeline stages — what runs on every PR vs. only on merge to main (lint,
-  typecheck, `anchor test`, web `jest`, docker build, devnet deploy)?
+  typecheck, `anchor test`, web `vitest`, docker build, devnet deploy)?
 - Is devnet deploy automatic on merge, or manual/gated?
 - Docker self-hosting note: since this app has no client-side wallet, likely
   _no_ `NEXT_PUBLIC_*` env vars are needed at all (everything Solana-related
