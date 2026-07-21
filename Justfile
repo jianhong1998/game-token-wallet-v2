@@ -15,3 +15,11 @@ lint:
 [group: 'CI']
 typecheck:
   @pnpm typecheck
+
+[group: 'Dev']
+dev-up:
+  @docker compose up --build
+
+[group: 'Dev']
+dev-down:
+  @docker compose down --volumes

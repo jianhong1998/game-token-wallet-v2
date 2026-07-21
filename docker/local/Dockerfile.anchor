@@ -1,0 +1,47 @@
+# Built for linux/amd64 (forced via docker-compose.yml's `platform:` key) —
+# Solana/Anchor publish no linux/arm64 prebuilt binaries for the Solana CLI
+# or anchor-cli, which would otherwise force multi-minute from-source
+# compiles of the entire toolchain on Apple Silicon hosts. Building for
+# amd64 (transparently emulated by Docker Desktop) lets every install below
+# use the same prebuilt binaries CI (x86_64 Linux) uses.
+#
+# Uses the `-trixie` (Debian 13, glibc 2.41) variant rather than
+# `-bookworm` (Debian 12, glibc 2.36): the prebuilt anchor-cli 1.1.2
+# x86_64-linux binary requires GLIBC_2.39+, which bookworm doesn't ship
+# (`anchor-1.1.2: ... version 'GLIBC_2.39' not found` at runtime).
+FROM node:24.18.0-trixie
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl ca-certificates build-essential pkg-config libssl-dev git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Rust toolchain — needed to build `avm` itself (no prebuilt avm binaries
+# are published for any platform).
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Solana CLI (official installer; downloads a prebuilt x86_64-linux binary).
+RUN sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+ENV PATH="/root/.local/share/solana/install/active_release/bin:${PATH}"
+
+# Anchor CLI via AVM (downloads a prebuilt x86_64-linux anchor-cli binary).
+RUN cargo install --git https://github.com/solana-foundation/anchor --tag v1.1.2 avm --locked
+ENV PATH="/root/.avm/bin:${PATH}"
+RUN avm install 1.1.2 && avm use 1.1.2
+
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
+
+RUN solana-keygen new --no-bip39-passphrase --silent --outfile /root/.config/solana/id.json
+
+WORKDIR /workspace
+
+ENTRYPOINT ["sh", "-c"]
+# Airdrops to two distinct wallets: this container's own throwaway CLI
+# keypair (pays for `anchor build`/`anchor deploy`) and, separately, the
+# frontend's SYSTEM_ADMIN_SECRET_KEY dev wallet (address
+# 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV, derived from the throwaway
+# key in docker-compose.yml) — that wallet pays for every `noop`
+# transaction the frontend submits, and without funding it here every
+# transaction fails with "Attempt to debit an account but found no record
+# of a prior credit."
+CMD ["solana airdrop 10 --url \"$ANCHOR_PROVIDER_URL\" && solana airdrop 10 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV --url \"$ANCHOR_PROVIDER_URL\" && cd apps/on-chain-program && anchor build && anchor deploy --provider.cluster \"$ANCHOR_PROVIDER_URL\" && cd ../.. && pnpm install --frozen-lockfile && pnpm --filter on-chain-client run codegen"]

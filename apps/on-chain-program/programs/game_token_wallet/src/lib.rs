@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("BWS4UCkFps4XUs7bqqzgNxFZ3keLUMVbb9CJUpyefNob");
+declare_id!("4qetKWMztCYZLp9zqLZiNjmnSfy13JM5VAjkKmU8g42X");
 
 #[program]
 pub mod game_token_wallet {

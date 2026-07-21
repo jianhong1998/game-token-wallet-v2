@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-game_token_wallet = "BWS4UCkFps4XUs7bqqzgNxFZ3keLUMVbb9CJUpyefNob"
+game_token_wallet = "4qetKWMztCYZLp9zqLZiNjmnSfy13JM5VAjkKmU8g42X"
 
 [provider]
 cluster = "localnet"
