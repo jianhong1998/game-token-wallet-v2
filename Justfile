@@ -38,6 +38,17 @@ down-clean:
 down:
   @docker compose down
 
+# Fully wipe local Docker artifacts for this repo: named volumes AND
+# locally-built images. Use this instead of `down-clean` when you need a
+# genuine from-scratch rebuild — since `anchor build` now runs at image
+# build time (see docs/technical-related/challenges/
+# 001-program-deployment-performance-issue/001-issue-analysis.md), a fresh
+# volume alone reseeds from the still-cached image and is no longer a true
+# cold build.
+[group: 'Dev']
+clean-docker:
+  @docker compose down --volumes --rmi local
+
 # Builds and deploys the on-chain program to localnet, seeding the fixed
 # program-identity keypair (reproducible address) and deploying with the
 # fixed deployer keypair (reproducible upgrade authority) so this works
