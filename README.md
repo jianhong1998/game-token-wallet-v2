@@ -21,7 +21,7 @@ docker compose up --build
 This brings up three services, in order:
 
 1. **`surfpool`** — a local Solana validator, waits until healthy.
-2. **`program-deploy`** — one-shot: builds the Anchor program, deploys it to `surfpool`, then regenerates the TypeScript client (`packages/on-chain-client`) from the freshly-built IDL. Exits once done.
+2. **`program-deploy`** — one-shot: builds the Anchor program, deploys it to `surfpool`, then regenerates the TypeScript client (`apps/on-chain-client`) from the freshly-built IDL. Exits once done.
 3. **`frontend`** — boots the Next.js app on **http://localhost:3000** once `program-deploy` finishes.
 
 First run downloads/builds Docker images and can take several minutes; subsequent runs are much faster (Docker layer caching + named volumes for `node_modules`).

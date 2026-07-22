@@ -27,7 +27,7 @@ That address must always match:
 - `[programs.localnet]` in `apps/on-chain-program/Anchor.toml`
 - `PROGRAM_ID` in `docker-compose.yml` and `docker-compose.e2e.yml`
 - `GAME_TOKEN_WALLET_PROGRAM_ADDRESS` in the generated on-chain-client
-  (`packages/on-chain-client/src/generated/`)
+  (`apps/on-chain-client/src/generated/`)
 
 If this keypair is ever regenerated, re-run `anchor build && anchor keys
 sync && anchor build` locally with the new keypair at

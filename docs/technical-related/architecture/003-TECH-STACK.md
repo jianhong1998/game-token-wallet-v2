@@ -110,7 +110,7 @@ system_admin_pubkey]`, stores the hashed login password.
   via plain `cargo test` — no validator or Surfpool needed (pure logic like
   side-pot math, odd-chip remainder calculation).
 - On-chain program integration tests: `apps/on-chain-program-e2e`, run via
-  `anchor test`, consuming the generated `packages/on-chain-client` (same
+  `anchor test`, consuming the generated `apps/on-chain-client` (same
   client the frontend uses).
 - Web app: unit tests (vitest, per PRD/ticket references — exact runner to
   confirm when ticket 001 lands), colocated with source files.
