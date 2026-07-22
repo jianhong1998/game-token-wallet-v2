@@ -8,7 +8,7 @@ WORKDIR /workspace
 # (see task log).
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY apps/frontend/package.json ./apps/frontend/package.json
-COPY packages/on-chain-client ./packages/on-chain-client
+COPY apps/on-chain-client ./apps/on-chain-client
 RUN pnpm install --frozen-lockfile
 COPY apps/frontend ./apps/frontend
 RUN pnpm --filter frontend run build

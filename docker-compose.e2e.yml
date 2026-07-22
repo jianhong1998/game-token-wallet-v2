@@ -72,7 +72,7 @@ services:
       - e2e_frontend_node_modules:/workspace/apps/frontend/node_modules
       - e2e_on_chain_program_e2e_node_modules:/workspace/apps/on-chain-program-e2e/node_modules
       - e2e_e2e_node_modules:/workspace/apps/e2e/node_modules
-      - e2e_on_chain_client_node_modules:/workspace/packages/on-chain-client/node_modules
+      - e2e_on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
 
   frontend:
     build:
