@@ -43,6 +43,28 @@ COPY docker/local/fixtures/deployer-keypair.dev.json /root/.config/solana/id.jso
 
 WORKDIR /workspace
 
+# Bake `anchor build`'s compiled output into the image so a fresh
+# on_chain_program_target/cargo_registry/solana_platform_tools_cache
+# volume (e.g. right after `just down-clean`) gets seeded from here
+# instead of starting from zero — Docker auto-copies a named volume's
+# mount path from the image the first time that volume is empty. See
+# docs/technical-related/challenges/001-program-deployment-performance-issue/
+# 001-issue-analysis.md ("Pivot" section) for why this replaces relying on
+# the cache volumes alone.
+COPY apps/on-chain-program/Cargo.toml apps/on-chain-program/Cargo.lock apps/on-chain-program/Anchor.toml apps/on-chain-program/package.json apps/on-chain-program/
+COPY apps/on-chain-program/programs apps/on-chain-program/programs
+COPY docker/local/fixtures/game_token_wallet-keypair.dev.json docker/local/fixtures/game_token_wallet-keypair.dev.json
+
+# Seed the fixed deploy-identity keypair before building — same reasoning
+# as CMD's own seeding step below (docker/local/fixtures/README.md):
+# `anchor build` mints a random keypair if
+# target/deploy/<program>-keypair.json is missing, which would drift this
+# image's baked program address away from
+# `declare_id!`/`Anchor.toml`/`PROGRAM_ID`.
+RUN mkdir -p apps/on-chain-program/target/deploy && \
+    cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json && \
+    cd apps/on-chain-program && anchor build
+
 ENTRYPOINT ["sh", "-c"]
 # Airdrops to two distinct wallets: this container's fixed deployer keypair
 # (seeded above, pays for `anchor build`/`anchor deploy`) and, separately,
