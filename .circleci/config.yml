@@ -1,31 +1,19 @@
 version: 2.1
 
-# Shared toolchain install commands, used by `cargo-test` and
-# `on-chain-program-e2e`. This is NOT the plan's original one-liner
-# (`curl ... solana-install.solana.workers.dev | bash` + bare
-# `avm install latest`) — it's the sequence actually confirmed working in
-# `docker/local/Dockerfile.anchor` during Task 9:
-#   - Solana CLI comes from the official `release.anza.xyz/stable/install`
-#     script (the `solana-install.solana.workers.dev` one-liner referenced
-#     in the original plan draft was replaced during Task 9).
-#   - `avm` has no prebuilt binaries for any platform, so it's built from
-#     source via `cargo install`, which needs Rust installed first.
-#   - anchor-cli is pinned to 1.1.2 via `avm install 1.1.2 && avm use 1.1.2`
-#     (not `avm install latest`) to match the prebuilt binary confirmed
-#     working in Task 9 — `avm install latest` would float to whatever is
-#     newest at CI run time and is unverified.
+# Shared toolchain install command, used by `cargo-test` only.
 # Each PATH addition is appended to $BASH_ENV rather than exported inline,
 # because CircleCI runs every `run` step in a fresh non-login shell that
 # only inherits env set via $BASH_ENV from prior steps.
 #
-# `install_rust` is split out on its own because `cargo-test` only runs
-# `cargo test` on a pure-Rust crate with no Solana/Anchor CLI dependency
-# (confirmed: passes with solana/anchor/avm absent from PATH) — it needs
-# a Rust toolchain (cimg/base:current does not ship one; confirmed via
-# `docker run cimg/base:current` — no cargo/rustc present) but none of the
-# Solana-specific pieces below. `on-chain-program-e2e` runs `anchor test`
-# against a real validator and needs the full toolchain, so it composes
-# `install_rust` with the Solana/avm/anchor-cli steps.
+# `cargo-test` only runs `cargo test` on a pure-Rust crate with no
+# Solana/Anchor CLI dependency (confirmed: passes with solana/anchor/avm
+# absent from PATH) — it needs a Rust toolchain (cimg/base:current does not
+# ship one; confirmed via `docker run cimg/base:current` — no cargo/rustc
+# present) but nothing Solana-specific. `on-chain-program-e2e` no longer
+# needs this: it runs entirely inside `docker-compose.e2e.yml`'s
+# `on-chain-program-e2e` service (against the same `surfpool` +
+# `program-deploy` stack the `e2e` job uses), whose Anchor/Solana toolchain
+# lives in `docker/local/Dockerfile.anchor` — not duplicated here.
 commands:
   install_rust:
     steps:
@@ -35,25 +23,6 @@ commands:
       - run:
           name: Add cargo to PATH
           command: echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
-
-  install_anchor_toolchain:
-    steps:
-      - install_rust
-      - run:
-          name: Install Solana CLI
-          command: sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
-      - run:
-          name: Add Solana CLI to PATH
-          command: echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> "$BASH_ENV"
-      - run:
-          name: Install avm
-          command: cargo install --git https://github.com/solana-foundation/anchor --tag v1.1.2 avm --locked
-      - run:
-          name: Add avm to PATH
-          command: echo 'export PATH="$HOME/.avm/bin:$PATH"' >> "$BASH_ENV"
-      - run:
-          name: Install and select anchor-cli 1.1.2
-          command: avm install 1.1.2 && avm use 1.1.2
 
 jobs:
   lint:
@@ -90,16 +59,13 @@ jobs:
   # `:current` is a moving tag, so this isn't a hard pin — see report for
   # residual risk. That said, this job (see below) installs nothing but a
   # bare Rust toolchain via rustup, which has no specific glibc floor to
-  # defend here — unlike `on-chain-program-e2e`, it has no anchor-cli
-  # prebuilt binary whose GLIBC_2.39+ requirement would need pinning against.
+  # defend here.
   #
   # This job only runs `cargo test` on the on-chain-program crate, which has
   # exactly one trivial macro-generated test (`test_id`, from Anchor's
   # `declare_id!`) and no dependency on the Solana/Anchor CLI toolchain —
   # confirmed by running `cargo test` with solana/anchor/avm stripped from
-  # PATH. It only needs a bare Rust toolchain (`install_rust`), not the full
-  # `install_anchor_toolchain` (Solana CLI + avm-built-from-source + pinned
-  # anchor-cli) that `on-chain-program-e2e` needs for `anchor test`.
+  # PATH. It only needs a bare Rust toolchain (`install_rust`).
   cargo-test:
     docker:
       - image: cimg/base:current
@@ -111,34 +77,37 @@ jobs:
           working_directory: apps/on-chain-program
           command: cargo test
 
-  # ubuntu-2404: CircleCI's machine image naming pins the Ubuntu release
-  # explicitly (24.04, glibc 2.39), so this satisfies anchor-cli 1.1.2's
-  # GLIBC_2.39+ requirement without the ambiguity `cimg/base:current` has.
+  # Runs the on-chain-program-e2e vitest suite against `surfpool` +
+  # `program-deploy` from docker-compose.e2e.yml — the same stack the `e2e`
+  # job below boots, just targeting a different leaf container. Replaces the
+  # former bare-metal `anchor test` invocation (which needed the full
+  # Anchor/Solana toolchain plus a `surfpool` binary installed directly on
+  # this machine) with the toolchain that already lives in
+  # `docker/local/Dockerfile.anchor`, avoiding a second, duplicated install
+  # path. Positional service args scope Compose to just this chain, same
+  # pattern as the `e2e` job.
   on-chain-program-e2e:
     machine:
       image: ubuntu-2404:current
     steps:
       - checkout
-      - install_anchor_toolchain
-      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
-      - run: pnpm install --frozen-lockfile
-      - run: solana-keygen new --no-bip39-passphrase --silent --outfile ~/.config/solana/id.json
       - run:
-          name: anchor test
-          working_directory: apps/on-chain-program
-          command: anchor test
+          name: on-chain-program-e2e
+          command: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from on-chain-program-e2e surfpool program-deploy on-chain-program-e2e
 
-  # Command left exactly as the plan specifies — Task 10's fix for Compose
-  # aborting the whole stack on the first container exit was made at the
-  # docker-compose.e2e.yml level (program-deploy now blocks on
-  # `tail -f /dev/null` after a healthcheck marker file, instead of
-  # exiting 0), not in this job's command.
+  # Task 10's fix for Compose aborting the whole stack on the first
+  # container exit was made at the docker-compose.e2e.yml level
+  # (program-deploy now blocks on `tail -f /dev/null` after a healthcheck
+  # marker file, instead of exiting 0), not in this job's command.
+  # Positional service args scope Compose to just this job's chain
+  # (surfpool -> program-deploy -> frontend -> e2e), skipping the unrelated
+  # on-chain-program-e2e image/container.
   e2e:
     machine:
       image: ubuntu-2404:current
     steps:
       - checkout
-      - run: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+      - run: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e surfpool program-deploy frontend e2e
 
 workflows:
   ci:

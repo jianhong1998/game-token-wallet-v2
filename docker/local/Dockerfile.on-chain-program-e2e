@@ -1,0 +1,13 @@
+FROM node:24.18.0-trixie
+
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
+
+WORKDIR /workspace
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
+COPY apps/on-chain-program-e2e/package.json ./apps/on-chain-program-e2e/package.json
+COPY apps/on-chain-client ./apps/on-chain-client
+RUN pnpm install --frozen-lockfile --filter on-chain-program-e2e...
+COPY apps/on-chain-program-e2e ./apps/on-chain-program-e2e
+
+WORKDIR /workspace/apps/on-chain-program-e2e
+CMD ["pnpm", "test"]

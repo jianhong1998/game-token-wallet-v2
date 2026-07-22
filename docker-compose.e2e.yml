@@ -115,6 +115,17 @@ services:
     environment:
       E2E_BASE_URL: http://frontend:3000
 
+  on-chain-program-e2e:
+    build:
+      context: .
+      dockerfile: docker/local/Dockerfile.on-chain-program-e2e
+    depends_on:
+      program-deploy:
+        condition: service_healthy
+    environment:
+      SOLANA_RPC_URL: http://surfpool:8899
+      SOLANA_RPC_WS_URL: ws://surfpool:8900
+
 volumes:
   e2e_node_modules:
   e2e_frontend_node_modules:

@@ -1,11 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import {
   createSolanaRpc,
   createSolanaRpcSubscriptions,
-  createKeyPairSignerFromBytes,
+  generateKeyPairSigner,
   createTransactionMessage,
   pipe,
   setTransactionMessageFeePayerSigner,
@@ -20,17 +17,15 @@ import {
 } from "@solana/kit";
 import { getNoopInstruction, GAME_TOKEN_WALLET_PROGRAM_ADDRESS } from "on-chain-client";
 
-const RPC_URL = "http://127.0.0.1:8899";
-const RPC_WS_URL = "ws://127.0.0.1:8900";
+const RPC_URL = process.env.SOLANA_RPC_URL ?? "http://127.0.0.1:8899";
+const RPC_WS_URL = process.env.SOLANA_RPC_WS_URL ?? "ws://127.0.0.1:8900";
 
 describe("noop instruction round trip", () => {
   it("confirms on the local validator through the generated on-chain-client", async () => {
     const rpc = createSolanaRpc(RPC_URL);
     const rpcSubscriptions = createSolanaRpcSubscriptions(RPC_WS_URL);
 
-    const keypairPath = join(homedir(), ".config", "solana", "id.json");
-    const secretKeyBytes = new Uint8Array(JSON.parse(readFileSync(keypairPath, "utf-8")));
-    const payer = await createKeyPairSignerFromBytes(secretKeyBytes);
+    const payer = await generateKeyPairSigner();
 
     const airdrop = airdropFactory({ rpc, rpcSubscriptions });
     await airdrop({
