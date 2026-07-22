@@ -8,21 +8,35 @@ init:
 help:
   @just -l
 
+# Run Lint check
 [group: 'CI']
 lint:
   @pnpm lint
 
+# Run TypeScript type check
 [group: 'CI']
 typecheck:
   @pnpm typecheck
 
+# Start all services in docker with rebuilding images
 [group: 'Dev']
 up-build:
   @docker compose up --build
 
+# Start all services in docker
+[group: 'Dev']
+up:
+  @docker compose up
+
+# Stop all services in docker and clean up volumes
+[group: 'Dev']
+down-clean:
+  @docker compose down --volumes
+
+# Stop all services in docker
 [group: 'Dev']
 down:
-  @docker compose down --volumes
+  @docker compose down
 
 # Builds and deploys the on-chain program to localnet, seeding the fixed
 # program-identity keypair (reproducible address) and deploying with the
