@@ -50,6 +50,27 @@ services:
       - on_chain_program_e2e_node_modules:/workspace/apps/on-chain-program-e2e/node_modules
       - e2e_node_modules:/workspace/apps/e2e/node_modules
       - on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
+      # Anchor/Cargo build cache — see docs/technical-related/challenges/
+      # 001-program-deployment-performance-issue/001-issue-analysis.md.
+      # `anchor build` runs at container start (in Dockerfile.anchor's CMD)
+      # on every `docker compose up`, not at image build time — baking it
+      # into the image doesn't work because the `.:/workspace` bind mount
+      # above would immediately shadow it (apps/on-chain-program/target is
+      # gitignored, so the host side is empty). Instead these three named
+      # volumes persist the *build cache* across container recreations, so
+      # only the first run after `down --volumes` is a cold compile.
+      # Mounted at a sub-path of the `.:/workspace` bind mount above —
+      # Compose overlays the more specific (longer) mount path, so this
+      # takes precedence over the host's (empty) target/ dir.
+      - on_chain_program_target:/workspace/apps/on-chain-program/target
+      # Downloaded crate sources (crates.io registry index + package
+      # cache) — avoids re-fetching every dependency on every run.
+      - cargo_registry:/root/.cargo/registry
+      # `cargo build-sbf` (invoked internally by `anchor build`) downloads
+      # the Solana BPF/SBF `platform-tools` toolchain here on first use if
+      # not already present — persisting it avoids re-downloading it every
+      # run.
+      - solana_platform_tools_cache:/root/.cache/solana
 
   frontend:
     build:
@@ -92,3 +113,6 @@ volumes:
   on_chain_program_e2e_node_modules:
   e2e_node_modules:
   on_chain_client_node_modules:
+  on_chain_program_target:
+  cargo_registry:
+  solana_platform_tools_cache:
