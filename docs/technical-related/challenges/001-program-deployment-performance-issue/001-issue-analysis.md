@@ -56,3 +56,23 @@ Measured (`docker compose logs -t program-deploy`, first-to-last log line timest
 - Post-change, warm (second run, same volumes): 53s (13:04:34.287Z → 13:05:27.596Z)
 
 Regression check (Task 4): confirmed `docker compose up --build` from a fully wiped state (`just down-clean`) still succeeds — the cache volumes are purely additive.
+
+## Pivot: Bake `anchor build` Into the Image
+
+After shipping Option 2, observed that `just down-clean` (`docker compose down --volumes`) — which wipes the three cache volumes — is triggered more often in practice than `apps/on-chain-program` source actually changes. That flips the trade-off Option 1 was rejected on: paying a rebuild on every source edit (rare here) is cheaper than paying a cold compile on every `down-clean` (frequent here).
+
+Plain Option 1 (bake `anchor build` into the image, stop) still doesn't work as stated: `anchor deploy`, the airdrop steps, `pnpm install`, and codegen (`pnpm --filter on-chain-client run codegen`, whose output must land on the host) all require the live `surfpool` validator and must stay in `CMD` — they can't move to `docker build` time. And the `.:/workspace` bind mount is still required for those, not just for editing program source live.
+
+The design that resolves both: bake only the `anchor build` *compile* step into the image (`COPY` the on-chain-program source + fixed deploy keypair fixture, `RUN anchor build` in `Dockerfile.anchor`). Leave `docker-compose.yml` untouched — `on_chain_program_target`, `cargo_registry`, and `solana_platform_tools_cache` are already named volumes mounted at the exact paths the image now has content at, and Docker's documented behavior (an empty named volume mounted over a path that has content in the image gets seeded from that image content on first use) means a fresh volume after `down-clean` is no longer cold. `CMD` still runs `anchor build` before `anchor deploy` exactly as before — required anyway since deploy must run at runtime — so it's now a fast incremental compile off a warm seed, and the live bind-mount dev loop is preserved as a side effect rather than the goal.
+
+Teardown was split in two, since making `down-clean` also blow away the image would just relocate the "frequent cold build" problem it wiped out: `down-clean` stays a cheap, volume-only reset (`docker compose down --volumes`); a new `clean-docker` recipe (`docker compose down --volumes --rmi local`) covers the rare "wipe genuinely everything, including the image" case. `docker builder prune` (BuildKit's layer cache) was deliberately left out of `clean-docker` — it's host-wide, not scoped to this repo, and would clear build cache for unrelated projects on the same machine.
+
+Verified compatible with CI's `docker-compose.e2e.yml`: it reuses the same `Dockerfile.anchor` but fully overrides `command:`, so the image simply arrives with `anchor build` already done — no CI changes needed.
+
+`clean-docker`'s `--rmi local` note: it only removes images without a custom `image:` tag in the compose file, i.e. the two images this repo builds (`program-deploy`, `frontend`). The pulled `surfpool/surfpool@sha256:...` base image (explicit `image:` field) is intentionally left alone — it's not something this repo builds, and blowing it away would just force a multi-hundred-MB re-pull for no benefit.
+
+Measured (`docker compose logs -t program-deploy`, first-to-last log line timestamp):
+- Baseline (pre-Option-2, cold): 145s
+- Option 2, cold (fresh volumes, pre-image-bake): 201s
+- Option 2, warm (same volumes): 53s
+- Post-pivot, fresh volumes + pre-baked image (the `down-clean` case this pivot targets): 33.4s (2026-07-22T14:29:27.941Z → 14:30:01.330Z)
