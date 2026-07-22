@@ -2,7 +2,7 @@ services:
   surfpool:
     # Pinned by digest (not :latest) so upstream image updates can't silently break local dev / CI — bump deliberately when needed.
     image: surfpool/surfpool@sha256:4f7b64daa96ab42d8a0d46cd0de556b1c90386f56fd66cfdefcb5f7039fdec9f
-    command: ["start", "--no-tui"]
+    command: ["start", "--no-tui", "--db", "/data/surfnet.sqlite"]
     ports:
       - "8899:8899"
       - "8900:8900"
@@ -17,6 +17,8 @@ services:
       timeout: 2s
       retries: 30
     attach: false
+    volumes:
+      - surfpool_data:/data
 
   program-deploy:
     build:
@@ -109,6 +111,7 @@ services:
       - on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
 
 volumes:
+  surfpool_data:
   node_modules:
   frontend_node_modules:
   on_chain_program_e2e_node_modules:
