@@ -46,7 +46,7 @@ importers:
         version: 16.2.10(@babel/core@7.29.7(supports-color@7.2.0))(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       on-chain-client:
         specifier: workspace:*
-        version: link:../../packages/on-chain-client
+        version: link:../on-chain-client
       react:
         specifier: ^19.1.0
         version: 19.2.7
@@ -82,28 +82,7 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(supports-color@7.2.0)
 
-  apps/on-chain-program: {}
-
-  apps/on-chain-program-e2e:
-    dependencies:
-      '@solana/kit':
-        specifier: ^5.5.1
-        version: 5.5.1(typescript@5.9.3)
-      on-chain-client:
-        specifier: workspace:*
-        version: link:../../packages/on-chain-client
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.5
-        version: 22.20.1
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.0
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(supports-color@7.2.0)
-
-  packages/on-chain-client:
+  apps/on-chain-client:
     dependencies:
       '@solana/kit':
         specifier: ^5.5.1
@@ -123,6 +102,27 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.2.7
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(supports-color@7.2.0)
+
+  apps/on-chain-program: {}
+
+  apps/on-chain-program-e2e:
+    dependencies:
+      '@solana/kit':
+        specifier: ^5.5.1
+        version: 5.5.1(typescript@5.9.3)
+      on-chain-client:
+        specifier: workspace:*
+        version: link:../on-chain-client
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(supports-color@7.2.0)
 
 packages:
