@@ -1,9 +1,9 @@
 # Initialize repo (Git, PNPM)
 [group: 'Init']
 init:
-  @chmod +x ./.hooks/* && \
-    git config core.hooksPath ./.hooks && \
-    echo "✅ Git hooks are initialized"
+  @cd ./scripts && \
+    chmod +x init.sh && \
+    ./init.sh
 
 help:
   @just -l
@@ -43,3 +43,14 @@ test:
   @pnpm --filter on-chain-client run test
   @cd apps/on-chain-program && anchor test
   @docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+
+
+[group: 'On-Chain Program']
+program-build:
+  @cd ./apps/on-chain-program && \
+    anchor build
+
+[group: 'On-Chain Program']
+program-keys-sync:
+  @cd ./apps/on-chain-program && \
+    anchor keys sync
