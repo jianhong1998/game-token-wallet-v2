@@ -16,6 +16,7 @@ services:
       interval: 2s
       timeout: 2s
       retries: 30
+    attach: false
 
   program-deploy:
     build:
