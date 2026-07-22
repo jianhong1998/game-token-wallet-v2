@@ -13,7 +13,7 @@ This doc covers running the full stack locally and deploying the on-chain progra
 ## Quick start — run the full stack locally
 
 ```sh
-just dev-up
+just up-build
 # or, without just:
 docker compose up --build
 ```
@@ -31,14 +31,14 @@ First run downloads/builds Docker images and can take several minutes; subsequen
 Tear down when done:
 
 ```sh
-just dev-down
+just down
 # or:
 docker compose down --volumes
 ```
 
 ## Deploying the program to localnet
 
-`program-deploy` already does this automatically on every `just dev-up` — you don't need to do anything extra for a normal dev loop. The program always deploys to the same fixed address, **`FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t`**, because `docker/local/Dockerfile.anchor` seeds a committed, throwaway dev keypair (`docker/local/fixtures/game_token_wallet-keypair.dev.json`) into `apps/on-chain-program/target/deploy/` before every build — see [`docker/local/fixtures/README.md`](./docker/local/fixtures/README.md) for why this matters and what to do if that keypair ever needs to change.
+`program-deploy` already does this automatically on every `just up-build` — you don't need to do anything extra for a normal dev loop. The program always deploys to the same fixed address, **`FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t`**, because `docker/local/Dockerfile.anchor` seeds a committed, throwaway dev keypair (`docker/local/fixtures/game_token_wallet-keypair.dev.json`) into `apps/on-chain-program/target/deploy/` before every build — see [`docker/local/fixtures/README.md`](./docker/local/fixtures/README.md) for why this matters and what to do if that keypair ever needs to change.
 
 **If you're iterating on the Anchor program itself** and want a tighter loop than a full `docker compose up --build`:
 
@@ -48,13 +48,13 @@ anchor build
 anchor test              # spins up its own ephemeral validator, deploys, runs apps/on-chain-program-e2e
 ```
 
-**If you need to redeploy manually** against the already-running `surfpool` from `just dev-up` (e.g. after an incremental `anchor build` on the host):
+**If you need to redeploy manually** against the already-running `surfpool` from `just up-build` (e.g. after an incremental `anchor build` on the host):
 
 ```sh
-cd apps/on-chain-program
-anchor build
-anchor deploy --provider.cluster http://127.0.0.1:8899
+just deploy-program-local
 ```
+
+This seeds the same fixture keypair before building, so it deploys to the same fixed address rather than drifting.
 
 ⚠️ Only do this if the program's `declare_id!`/`Anchor.toml` still matches the keypair at `apps/on-chain-program/target/deploy/game_token_wallet-keypair.json` (i.e. you haven't deleted/regenerated it). If they've drifted, `anchor build && anchor keys sync && anchor build` first, then update every place listed in `docker/local/fixtures/README.md` to match, then `pnpm --filter on-chain-client run codegen`.
 

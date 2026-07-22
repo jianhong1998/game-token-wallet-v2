@@ -17,12 +17,22 @@ typecheck:
   @pnpm typecheck
 
 [group: 'Dev']
-dev-up:
+up-build:
   @docker compose up --build
 
 [group: 'Dev']
-dev-down:
+down:
   @docker compose down --volumes
+
+# Builds and deploys the on-chain program to localnet, seeding the fixed
+# fixture keypair first so the deployed address stays reproducible instead
+# of drifting from declare_id!/Anchor.toml/PROGRAM_ID (see
+# docker/local/fixtures/README.md).
+[group: 'Dev']
+deploy-program-local:
+  @mkdir -p apps/on-chain-program/target/deploy && \
+    cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json && \
+    cd apps/on-chain-program && anchor build && anchor deploy --provider.cluster localnet
 
 [group: 'CI']
 test:
