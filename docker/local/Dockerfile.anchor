@@ -31,19 +31,26 @@ RUN avm install 1.1.2 && avm use 1.1.2
 
 RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
 
-RUN solana-keygen new --no-bip39-passphrase --silent --outfile /root/.config/solana/id.json
+# Fixed local-dev deploy/upgrade-authority identity — a throwaway, non-secret
+# keypair committed at docker/local/fixtures/deployer-keypair.dev.json (see
+# the README alongside it), distinct from the program's own identity keypair.
+# Copied in rather than `solana-keygen new`-generated: a freshly generated
+# key differs on every image build, so a later `anchor deploy` from a
+# rebuilt image (or from the host via `just deploy-program-local`) would
+# fail with "Upgrade authority mismatch" against whatever authority an
+# earlier build/run already set on the deployed program.
+COPY docker/local/fixtures/deployer-keypair.dev.json /root/.config/solana/id.json
 
 WORKDIR /workspace
 
 ENTRYPOINT ["sh", "-c"]
-# Airdrops to two distinct wallets: this container's own throwaway CLI
-# keypair (pays for `anchor build`/`anchor deploy`) and, separately, the
-# frontend's SYSTEM_ADMIN_SECRET_KEY dev wallet (address
-# 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV, derived from the throwaway
-# key in docker-compose.yml) — that wallet pays for every `noop`
-# transaction the frontend submits, and without funding it here every
-# transaction fails with "Attempt to debit an account but found no record
-# of a prior credit."
+# Airdrops to two distinct wallets: this container's fixed deployer keypair
+# (seeded above, pays for `anchor build`/`anchor deploy`) and, separately,
+# the frontend's SYSTEM_ADMIN_SECRET_KEY dev wallet (address
+# 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV, a fixed key set directly in
+# docker-compose.yml) — that wallet pays for every `noop` transaction the
+# frontend submits, and without funding it here every transaction fails
+# with "Attempt to debit an account but found no record of a prior credit."
 # Seeds target/deploy/game_token_wallet-keypair.json from the committed
 # throwaway fixture (docker/local/fixtures/game_token_wallet-keypair.dev.json,
 # see the README alongside it) BEFORE `anchor build` runs. That gitignored

@@ -34,3 +34,26 @@ sync && anchor build` locally with the new keypair at
 `apps/on-chain-program/target/deploy/game_token_wallet-keypair.json`, then
 update all of the above to match, then regenerate the client
 (`pnpm --filter on-chain-client run codegen`).
+
+## `deployer-keypair.dev.json`
+
+A second throwaway, non-secret Solana keypair — the fixed local-dev
+**deploy/upgrade authority**, distinct from the program's own identity
+keypair above. Pubkey: `33E2VtnYAYjzJ9r9giiKBHEgmNUzHRGwWrE1hdHcmREs`.
+
+`docker/local/Dockerfile.anchor` copies this file to
+`/root/.config/solana/id.json` at image build time (replacing what used to
+be a `solana-keygen new`-generated key), and `just deploy-program-local`
+passes it via `anchor deploy --provider.wallet` on the host. Both paths
+using the same fixed key means whichever one deploys the program first
+sets this as its on-chain upgrade authority, and the other can always
+redeploy/upgrade afterward without hitting `Error: Upgrade authority
+mismatch`.
+
+If this keypair is ever regenerated, the currently-running local
+`surfpool` (and any other locally-deployed instance) will need to have its
+upgrade authority reassigned to the new key with
+`solana program set-upgrade-authority <PROGRAM_ID> --new-upgrade-authority
+<new-keypair-path>` using the *old* key, or simply be torn down and
+redeployed fresh (`just down && just up-build`) since local validator
+state is ephemeral.
