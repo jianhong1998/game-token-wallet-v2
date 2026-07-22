@@ -10,7 +10,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -sf -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}' http://localhost:8899 || exit 1",
+          'curl -sf -X POST -H ''Content-Type: application/json'' -d ''{"jsonrpc":"2.0","id":1,"method":"getHealth"}'' http://localhost:8899 || exit 1',
         ]
       interval: 2s
       timeout: 2s
@@ -69,18 +69,8 @@ services:
         condition: service_completed_successfully
     ports:
       - "3000:3000"
-    environment:
-      SOLANA_CLUSTER: localnet
-      SOLANA_RPC_URL: http://surfpool:8899
-      # Fixed local-dev program deploy identity — matches the throwaway
-      # keypair committed at docker/local/fixtures/game_token_wallet-keypair.dev.json
-      # (see the README alongside it), which docker/local/Dockerfile.anchor
-      # seeds into `target/deploy/game_token_wallet-keypair.json` before
-      # every `anchor build`. This guarantees program-deploy always deploys
-      # to this exact address, on every machine and every rebuild, instead
-      # of drifting whenever the gitignored keypair goes missing.
-      PROGRAM_ID: "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t"
-      SYSTEM_ADMIN_SECRET_KEY: "PzfkD238UH1WRMoQZpt9uJpJda2eLJYtv7Bi7qscpjWH3E1Fjm2odmcSu1XDz1FTz2yZfBWfYBYU4arQzFNNmis"
+    env_file:
+      - ./apps/frontend/.env
     volumes:
       - .:/workspace
       # Same named volumes as program-deploy — see the comment there.

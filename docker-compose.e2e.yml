@@ -7,7 +7,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -sf -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}' http://localhost:8899 || exit 1",
+          'curl -sf -X POST -H ''Content-Type: application/json'' -d ''{"jsonrpc":"2.0","id":1,"method":"getHealth"}'' http://localhost:8899 || exit 1',
         ]
       interval: 2s
       timeout: 2s
@@ -50,7 +50,7 @@ services:
         cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json &&
         solana airdrop 10 --url "$$ANCHOR_PROVIDER_URL" &&
         solana airdrop 10 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV --url "$$ANCHOR_PROVIDER_URL" &&
-        cd apps/on-chain-program && anchor build && anchor deploy --provider.cluster "$$ANCHOR_PROVIDER_URL" &&
+        cd apps/on-chain-program && anchor build && anchor program deploy --provider.cluster "$$ANCHOR_PROVIDER_URL" &&
         cd ../.. && pnpm install --frozen-lockfile && pnpm --filter on-chain-client run codegen &&
         touch /tmp/deploy-complete && tail -f /dev/null
     healthcheck:
@@ -98,7 +98,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"require('net').createConnection(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\"",
+          'node -e "require(''net'').createConnection(3000,''127.0.0.1'').on(''connect'',()=>process.exit(0)).on(''error'',()=>process.exit(1))"',
         ]
       interval: 2s
       timeout: 2s
