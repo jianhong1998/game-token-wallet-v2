@@ -45,3 +45,14 @@ Build in image at a path outside `/workspace` (e.g. `/root/build`), then copy or
 - Still requires an image rebuild on every program-source change to get any benefit — doesn't fix the dev-loop problem, just works around the mount conflict.
 - Adds sync/copy complexity for marginal benefit over Option 2.
 - Not selected.
+
+## Implementation Outcome
+
+Implemented Option 2: added three named Docker volumes to `program-deploy` in `docker-compose.yml` — `on_chain_program_target` (`/workspace/apps/on-chain-program/target`), `cargo_registry` (`/root/.cargo/registry`), `solana_platform_tools_cache` (`/root/.cache/solana`). No Dockerfile or CMD changes.
+
+Measured (`docker compose logs -t program-deploy`, first-to-last log line timestamp):
+- Baseline (pre-change, cold): 145s (2026-07-22T12:57:01.938Z → 12:59:26.690Z)
+- Post-change, cold (first run on fresh volumes): 201s (13:00:49.438Z → 13:04:10.134Z)
+- Post-change, warm (second run, same volumes): 53s (13:04:34.287Z → 13:05:27.596Z)
+
+Regression check (Task 4): confirmed `docker compose up --build` from a fully wiped state (`just down-clean`) still succeeds — the cache volumes are purely additive.
