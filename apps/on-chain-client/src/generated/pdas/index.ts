@@ -6,5 +6,4 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./initializeRegistry";
-export * from "./noop";
+export * from "./registry";

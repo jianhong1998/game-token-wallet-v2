@@ -7,6 +7,7 @@
  */
 
 import {
+  assertIsInstructionWithAccounts,
   containsBytes,
   fixEncoderSize,
   getBytesEncoder,
@@ -16,14 +17,41 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
+  parseInitializeRegistryInstruction,
   parseNoopInstruction,
+  type ParsedInitializeRegistryInstruction,
   type ParsedNoopInstruction,
 } from "../instructions";
 
 export const GAME_TOKEN_WALLET_PROGRAM_ADDRESS =
   "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t" as Address<"FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t">;
 
+export enum GameTokenWalletAccount {
+  Registry,
+}
+
+export function identifyGameTokenWalletAccount(
+  account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): GameTokenWalletAccount {
+  const data = "data" in account ? account.data : account;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([47, 174, 110, 246, 184, 182, 252, 218]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletAccount.Registry;
+  }
+  throw new Error(
+    "The provided account could not be identified as a gameTokenWallet account.",
+  );
+}
+
 export enum GameTokenWalletInstruction {
+  InitializeRegistry,
   Noop,
 }
 
@@ -31,6 +59,17 @@ export function identifyGameTokenWalletInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): GameTokenWalletInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([189, 181, 20, 17, 174, 57, 249, 59]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.InitializeRegistry;
+  }
   if (
     containsBytes(
       data,
@@ -49,15 +88,26 @@ export function identifyGameTokenWalletInstruction(
 
 export type ParsedGameTokenWalletInstruction<
   TProgram extends string = "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t",
-> = {
-  instructionType: GameTokenWalletInstruction.Noop;
-} & ParsedNoopInstruction<TProgram>;
+> =
+  | ({
+      instructionType: GameTokenWalletInstruction.InitializeRegistry;
+    } & ParsedInitializeRegistryInstruction<TProgram>)
+  | ({
+      instructionType: GameTokenWalletInstruction.Noop;
+    } & ParsedNoopInstruction<TProgram>);
 
 export function parseGameTokenWalletInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedGameTokenWalletInstruction<TProgram> {
   const instructionType = identifyGameTokenWalletInstruction(instruction);
   switch (instructionType) {
+    case GameTokenWalletInstruction.InitializeRegistry: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.InitializeRegistry,
+        ...parseInitializeRegistryInstruction(instruction),
+      };
+    }
     case GameTokenWalletInstruction.Noop: {
       return {
         instructionType: GameTokenWalletInstruction.Noop,
