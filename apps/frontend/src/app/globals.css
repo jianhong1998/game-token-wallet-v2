@@ -3,9 +3,68 @@
 @theme {
   --breakpoint-sm: 30rem;
   --width-app-max: 28rem;
+
+  --color-ink: #0b0620;
+  --color-violet-deep: #140a30;
+  --color-violet-accent: #8b5cf6;
+  --color-cyan-accent: #22d3ee;
+  --color-lavender: #a78bfa;
+  --color-sky-cyan: #67e8f9;
+  --color-lilac: #c4b5fd;
+  --color-danger: #fb7185;
+  --color-text-primary: #f4f1fb;
+  --color-text-secondary: rgb(244 241 251 / 0.55);
+  --color-text-muted: rgb(244 241 251 / 0.45);
+
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-space-mono);
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-shell: 32px;
 }
 
 .app-shell {
   max-width: var(--width-app-max);
   margin-inline: auto;
+}
+
+.bg-app-shell {
+  background-image:
+    radial-gradient(circle at 12% 8%, rgb(139 92 246 / 0.35), transparent 40%),
+    radial-gradient(circle at 90% 85%, rgb(34 211 238 / 0.3), transparent 46%),
+    linear-gradient(160deg, var(--color-ink), var(--color-violet-deep));
+}
+
+.bg-gradient-primary {
+  background-image: linear-gradient(90deg, var(--color-violet-accent), var(--color-cyan-accent));
+}
+
+.text-gradient-balance {
+  background-image: linear-gradient(90deg, var(--color-lavender), var(--color-sky-cyan));
+  background-clip: text;
+  color: transparent;
+}
+
+.glass-hero {
+  background-color: rgb(255 255 255 / 0.07);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(18px);
+  border-radius: var(--radius-xl);
+}
+
+.glass-row {
+  background-color: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+}
+
+.glass-input {
+  background-color: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(10px);
+  border-radius: var(--radius-md);
 }
