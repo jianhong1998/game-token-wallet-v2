@@ -17,6 +17,11 @@ volumes:
 
 `apps/on-chain-program/target/` is gitignored (`.gitignore:20`, only `target/idl/` is force-included back in). So on the host, `target/` doesn't exist. The moment the container starts, that bind mount overlays the host's repo (no `target/`) on top of `/workspace`, shadowing/erasing whatever `anchor build` produced into `/workspace/apps/on-chain-program/target` during `docker build`. Baking the build into the image at that path is therefore pointless as stated — it gets hidden immediately at runtime.
 
+### Scope & notes
+
+- Out of scope: host-native builds (`just deploy-program-local`, `just program-build`) already benefit from the host's own persistent disk for `target/` — this is a Docker-specific problem. CI (`docker-compose.e2e.yml`) runs the same `anchor build` on ephemeral runners where Docker named volumes don't survive between separate job runs, so fixing its build caching (if even slow there) is a separate concern with its own tooling (e.g. CircleCI cache steps).
+- `apps/on-chain-program/target/idl` never needs to reach the host: `.gitignore`'s `!apps/on-chain-program/target/idl/` force-include exception is currently unused (`git ls-files apps/on-chain-program/target` is empty — nothing under `target/` is actually tracked). The client codegen step reads `target/idl/game_token_wallet.json` inside the same container run, after `anchor build` finishes and before the container exits; only its own output (`apps/on-chain-client/src/generated`) needs to land on the host, via the pre-existing `.:/workspace` bind mount. So parking all of `target/` (including `idl/`) in a container-only named volume is safe.
+
 ## Solutions & Trade-offs
 
 ### Option 1 — COPY source into the image and build at image-build time
@@ -76,3 +81,16 @@ Measured (`docker compose logs -t program-deploy`, first-to-last log line timest
 - Option 2, cold (fresh volumes, pre-image-bake): 201s
 - Option 2, warm (same volumes): 53s
 - Post-pivot, fresh volumes + pre-baked image (the `down-clean` case this pivot targets): 33.4s (2026-07-22T14:29:27.941Z → 14:30:01.330Z)
+
+## Update (2026-07-23): `CMD` extracted into `scripts/deploy-local.sh`
+
+The runtime deploy logic described above as living in `CMD` was extracted out
+of `docker/local/Dockerfile.anchor`'s `CMD` into `scripts/deploy-local.sh`,
+invoked via `ENTRYPOINT ["scripts/deploy-local.sh"]` — a maintainability fix
+(the `CMD` string had grown too long to read/edit), not a behavior or
+performance change. The script isn't `COPY`ed into the image; it arrives via
+the same `.:/workspace` bind mount as the rest of the repo, same as before.
+
+Every `CMD` reference elsewhere in this doc describes the pre-extraction
+mechanism; the steps and their ordering (seed keypair → airdrop → `anchor
+build` → `anchor deploy` → codegen) are unchanged.
