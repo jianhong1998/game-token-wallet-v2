@@ -25,3 +25,6 @@ target/
 
 # Playwright MCP scratch output (console/page snapshots from browser-tool verification runs)
 .playwright-mcp/
+
+# Autonomous-feature-development pipeline run state (task/log/review artifacts)
+.loop-logs/
