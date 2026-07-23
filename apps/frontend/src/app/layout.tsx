@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Space_Mono } from "next/font/google";
+import { AppShell } from "@/components/AppShell/AppShell";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -24,7 +25,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${manrope.variable} ${spaceMono.variable}`}>
-      <body className="app-shell min-h-screen px-4 font-sans text-text-primary">{children}</body>
+      <body className="min-h-screen font-sans text-text-primary">
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }
