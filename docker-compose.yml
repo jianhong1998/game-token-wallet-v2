@@ -2,7 +2,7 @@ services:
   surfpool:
     # Pinned by digest (not :latest) so upstream image updates can't silently break local dev / CI — bump deliberately when needed.
     image: surfpool/surfpool@sha256:4f7b64daa96ab42d8a0d46cd0de556b1c90386f56fd66cfdefcb5f7039fdec9f
-    command: ["start", "--no-tui"]
+    command: ["start", "--no-tui", "--db", "/data/surfnet.sqlite"]
     ports:
       - "8899:8899"
       - "8900:8900"
@@ -16,6 +16,9 @@ services:
       interval: 2s
       timeout: 2s
       retries: 30
+    attach: false
+    volumes:
+      - surfpool_data:/data
 
   program-deploy:
     build:
@@ -50,6 +53,27 @@ services:
       - on_chain_program_e2e_node_modules:/workspace/apps/on-chain-program-e2e/node_modules
       - e2e_node_modules:/workspace/apps/e2e/node_modules
       - on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
+      # Anchor/Cargo build cache — see docs/technical-related/challenges/
+      # 001-program-deployment-performance-issue/001-issue-analysis.md.
+      # `anchor build` runs at container start (in Dockerfile.anchor's CMD)
+      # on every `docker compose up`, not at image build time — baking it
+      # into the image doesn't work because the `.:/workspace` bind mount
+      # above would immediately shadow it (apps/on-chain-program/target is
+      # gitignored, so the host side is empty). Instead these three named
+      # volumes persist the *build cache* across container recreations, so
+      # only the first run after `down --volumes` is a cold compile.
+      # Mounted at a sub-path of the `.:/workspace` bind mount above —
+      # Compose overlays the more specific (longer) mount path, so this
+      # takes precedence over the host's (empty) target/ dir.
+      - on_chain_program_target:/workspace/apps/on-chain-program/target
+      # Downloaded crate sources (crates.io registry index + package
+      # cache) — avoids re-fetching every dependency on every run.
+      - cargo_registry:/root/.cargo/registry
+      # `cargo build-sbf` (invoked internally by `anchor build`) downloads
+      # the Solana BPF/SBF `platform-tools` toolchain here on first use if
+      # not already present — persisting it avoids re-downloading it every
+      # run.
+      - solana_platform_tools_cache:/root/.cache/solana
 
   frontend:
     build:
@@ -87,8 +111,12 @@ services:
       - on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
 
 volumes:
+  surfpool_data:
   node_modules:
   frontend_node_modules:
   on_chain_program_e2e_node_modules:
   e2e_node_modules:
   on_chain_client_node_modules:
+  on_chain_program_target:
+  cargo_registry:
+  solana_platform_tools_cache:
