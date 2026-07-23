@@ -127,6 +127,28 @@ services:
     environment:
       SOLANA_RPC_URL: http://surfpool:8899
       SOLANA_RPC_WS_URL: ws://surfpool:8900
+    # Same Compose limitation as program-deploy above (docker/compose#10233,
+    # #13223): --abort-on-container-exit tears down the whole stack the
+    # instant this container's Dockerfile CMD ("pnpm test") exits 0 on its
+    # own — which happened before the e2e service's frontend healthcheck
+    # cleared, silently preventing admin-registry.spec.ts/noop.spec.ts from
+    # ever running. Fix: never let this container exit during the run — run
+    # the real test command, then block forever on `tail -f /dev/null` and
+    # signal completion via a marker file + healthcheck instead of
+    # Compose's exit-based service_completed_successfully. The `&&` chain
+    # must short-circuit on test failure (no `|| true`) so a genuine test
+    # failure still exits non-zero immediately.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        pnpm test &&
+        touch /tmp/test-complete && tail -f /dev/null
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/test-complete"]
+      interval: 5s
+      timeout: 2s
+      retries: 120
+      start_period: 5s
 
 volumes:
   e2e_node_modules:
