@@ -26,32 +26,34 @@ services:
         condition: service_healthy
     environment:
       ANCHOR_PROVIDER_URL: http://surfpool:8899
-    # Overrides Dockerfile.anchor's default CMD (which exits 0 after
-    # deploying — correct for docker-compose.yml's dev loop, where nothing
-    # else races that exit). Here, the required verification command
-    # (`up --build --abort-on-container-exit --exit-code-from e2e`, no
-    # positional service args — same command Task 11's CircleCI `e2e` job
-    # runs) treats every service as "explicit", and --abort-on-container-exit
-    # aborts the WHOLE stack the instant ANY explicit container exits —
-    # even a one-shot dependency container that exited 0 on purpose. This
-    # is a documented Compose limitation, not an application bug (see
-    # docker/compose#10233, #13223): confirmed empirically in this task —
-    # an earlier attempt with the unmodified exit-on-completion CMD
-    # reproducibly tore down surfpool mid-flight the moment program-deploy
-    # exited, well before frontend/e2e finished, failing frontend with
-    # "getaddrinfo ENOTFOUND surfpool". Fix: never let this container exit
-    # during the run — do the same build/deploy/codegen work, then block
-    # forever on `tail -f /dev/null` and signal completion via a marker
-    # file + healthcheck instead of Compose's exit-based
-    # service_completed_successfully.
+    # Dockerfile.anchor's ENTRYPOINT (scripts/deploy-local.sh) exits 0 as
+    # soon as deploy/codegen finishes — correct for docker-compose.yml's dev
+    # loop, where nothing else races that exit. Here, the required
+    # verification command (`up --build --abort-on-container-exit
+    # --exit-code-from e2e`, no positional service args — same command
+    # Task 11's CircleCI `e2e` job runs) treats every service as "explicit",
+    # and --abort-on-container-exit aborts the WHOLE stack the instant ANY
+    # explicit container exits — even a one-shot dependency container that
+    # exited 0 on purpose. This is a documented Compose limitation, not an
+    # application bug (see docker/compose#10233, #13223): confirmed
+    # empirically in this task — an earlier attempt with the unmodified
+    # exit-on-completion entrypoint reproducibly tore down surfpool
+    # mid-flight the moment program-deploy exited, well before frontend/e2e
+    # finished, failing frontend with "getaddrinfo ENOTFOUND surfpool". Fix:
+    # never let this container exit during the run — run the entrypoint
+    # script for the normal build/deploy/codegen work, then block forever on
+    # `tail -f /dev/null` and signal completion via a marker file +
+    # healthcheck instead of Compose's exit-based service_completed_successfully.
+    #
+    # `entrypoint:` must be overridden too, not just `command:` — Compose
+    # appends `command:` as argv to whatever ENTRYPOINT the image declares
+    # (here, scripts/deploy-local.sh, which ignores extra args), it does NOT
+    # replace ENTRYPOINT. Resetting entrypoint to a shell makes command: run
+    # as an actual shell command again.
+    entrypoint: ["/bin/bash", "-c"]
     command:
       - >-
-        mkdir -p apps/on-chain-program/target/deploy &&
-        cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json &&
-        solana airdrop 10 --url "$$ANCHOR_PROVIDER_URL" &&
-        solana airdrop 10 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV --url "$$ANCHOR_PROVIDER_URL" &&
-        cd apps/on-chain-program && anchor build && anchor program deploy --provider.cluster "$$ANCHOR_PROVIDER_URL" &&
-        cd ../.. && pnpm install --frozen-lockfile && pnpm --filter on-chain-client run codegen &&
+        scripts/deploy-local.sh &&
         touch /tmp/deploy-complete && tail -f /dev/null
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/deploy-complete"]
