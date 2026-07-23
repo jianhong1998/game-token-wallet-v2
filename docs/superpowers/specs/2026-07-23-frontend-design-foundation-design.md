@@ -230,13 +230,15 @@ both are kept as-is, everything else is new:
   --blur-input: 10px;
   --blur-list: 12px;
   --blur-hero: 18px;
-
-  /* spacing */
-  --spacing-page: 1.5rem;      /* 24px, page padding */
-  --spacing-card-gap: 0.625rem; /* 10px */
-  --spacing-section-gap: 1.25rem; /* 20px */
 }
 ```
+
+Spacing (page padding 24px, card gap 10px, section gap 20px) is deliberately
+**not** a set of custom `@theme` tokens — all three values land exactly on
+Tailwind's built-in spacing scale (`px-6` = 1.5rem/24px, `gap-2.5` =
+0.625rem/10px, `gap-5` = 1.25rem/20px), so components use those utilities
+directly rather than defining redundant custom vars that would just duplicate
+the built-in scale under new names.
 
 Type scale (size only — weight applied per-component via Tailwind's
 `font-{weight}` utilities against the loaded Manrope weights, since `@theme
@@ -272,7 +274,7 @@ Applied as `className` on `<html>` (or `<body>`), exposing the CSS vars the
 ### Route groups & shell
 
 - `apps/frontend/src/app/(auth)/layout.tsx` and `apps/frontend/src/app/(app)/layout.tsx`: new, both thin pass-throughs (`return children`) — no chrome yet, just scaffolding for ticket 003+.
-- `apps/frontend/src/components/AppShell/AppShell.tsx` (+ colocated test): replaces `.app-shell`. Applies `max-width: var(--width-app-max)` centered, side margins at wider viewports, `--spacing-page` padding, and the `.bg-app-shell` gradient background token.
+- `apps/frontend/src/components/AppShell/AppShell.tsx` (+ colocated test): wraps and internally reuses the existing `.app-shell` CSS class (max-width `var(--width-app-max)`, centered) rather than eliminating it — `.app-shell`'s max-width already reads from a token today, and Tailwind v4's `--width-*` theme namespace doesn't auto-generate a `max-w-*` utility (only `--max-width-*` does), so re-deriving the same rule as inline utility classes would need a token rename for no behavioral gain. `AppShell` is the sole intended consumer of `.app-shell` going forward; adds `px-6` page padding and the `.bg-app-shell` gradient background token.
 - `app/layout.tsx`: wraps `{children}` in `<AppShell>` once, globally — every route (admin, home, auth, app) gets it.
 
 ### Component set (`apps/frontend/src/components/`)
@@ -286,9 +288,12 @@ Applied as `className` on `<html>` (or `<body>`), exposing the CSS vars the
 
 **`Alert`** (`components/ui/alert.tsx`, shadcn-generated then customized in place): `variant: "success" | "error"` (`--color-cyan-accent` / `--color-danger`), glass surface, text-only (no icons).
 
-**`Loading`** (`components/Loading/`):
-- `Spinner.tsx`: ~18px CSS ring, `animate-spin`, `--color-violet-accent` stroke.
-- `PageLoader.tsx`: full-page, `public/chip-icon.svg` centered, `perspective` wrapper + `rotateY` keyframe animation (continuous), CSS `filter: saturate(1.6) hue-rotate(220deg) brightness(1.3)`.
+**`Loading`** — two sibling components (not nested under a shared `Loading/`
+folder — every other hand-rolled component in this ticket gets its own
+eponymous folder, e.g. `AppShell/AppShell.tsx`, and these follow the same
+convention):
+- `components/Spinner/Spinner.tsx`: ~18px CSS ring, `animate-spin`, `--color-violet-accent` stroke.
+- `components/PageLoader/PageLoader.tsx`: full-page, `public/chip-icon.svg` centered, `perspective` wrapper + `rotateY` keyframe animation (continuous), CSS `filter: saturate(1.6) hue-rotate(220deg) brightness(1.3)`.
 
 Each component gets a colocated `Component.test.tsx` per the codebase-structure convention, using the new `@testing-library/react` + `jsdom` setup: render + accessible-role/text assertions, variant-class assertions, and (for `Button`) the loading-state behavior above.
 

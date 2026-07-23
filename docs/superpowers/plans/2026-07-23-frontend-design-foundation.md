@@ -1151,7 +1151,7 @@ git commit -m "docs: mark ticket 017 done"
 - Design tokens in `globals.css` `@theme`, replacing the placeholder → Task 2.
 - `Button`/`Input`/`Alert`/`Loading` component set, colocated tests → Tasks 1, 3, 4, 5, 6.
 - `(auth)`/`(app)` route groups → Task 7.
-- Shared layout shell, token-driven, replacing hardcoded `.app-shell` usage → Task 7.
+- Shared layout shell, token-driven, formalizing the mobile-first/desktop-capped-width behavior into a component (wraps and internally reuses `.app-shell` rather than eliminating it — see Task 2's step 1 note and the spec's "Route groups & shell" section) → Task 7.
 - Admin registry retrofit, e2e coverage unmodified → Task 8, verified in Task 9.
 - Out-of-scope list (Modal/Select/Badge/Nav/Card) → untouched, no task builds them.
 - Every grill-session decision (Q1–Q10 in the spec) maps to a concrete task above — route placement (Q1) and shell placement (Q2) → Task 7; test infra (Q3) → Task 1; Button shape (Q4, Q10) → Task 3; fonts (Q5) → Task 2; success color (Q6) → Tasks 2/5; Loading split (Q7) → Tasks 1/6; Input/Alert via shadcn (Q9) → Tasks 4/5.
@@ -1159,6 +1159,8 @@ git commit -m "docs: mark ticket 017 done"
 **2. Placeholder scan:** No TBD/TODO markers; every code step has complete, runnable file contents; every test has real assertions, not "add tests for the above."
 
 **3. Type consistency:** `Button`'s `variant` union (`"primary" | "secondary" | "destructive"`) is identical in Task 3's implementation and every consumer (Task 8's `variant="primary"`). `Alert`'s `variant` union (`"success" | "error"`) is identical in Task 5 and Task 8. `Spinner`'s single prop (`className?: string`) matches its one call site inside `Button` (Task 3, no className passed — uses the default). `cn` is defined once (Task 3) and imported with the same signature in Tasks 4 and 5.
+
+**4. Path fidelity (spec vs. plan file paths):** Every `Create`/`Modify` path in this plan's tasks was diffed against the spec's stated paths after an `/enhanced-review` pass caught three mismatches (custom `--spacing-*` tokens vs. Tailwind built-ins, `.app-shell` "replaces" vs. "wraps and reuses" wording, `components/Loading/` vs. sibling `components/Spinner/`+`components/PageLoader/` folders) — all three were reconciled by amending the spec to match this plan's actual implementation (2026-07-23). No remaining path disagreements between the two documents.
 
 ---
 
