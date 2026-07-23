@@ -146,6 +146,22 @@ absolutely centered over them, and the button is forced `disabled` +
 `aria-busy="true"`. Button width/height don't shift, and a double-click during
 a pending action is structurally prevented (not just discouraged).
 
+### Q9: Does the "shadcn/Radix primitives where applicable" pattern extend to `Input` and `Alert`, or just `Button`?
+
+**Answer:** Extends to both.
+
+**Decision:** `Input` and `Alert` are generated via the shadcn CLI
+(`components/ui/input.tsx`, `components/ui/alert.tsx`) and customized in
+place, identically to `Button` (Q4) — not hand-rolled at `components/Input/`
+/ `components/Alert/` as an earlier draft of this doc had them. `Loading`
+(`Spinner`/`PageLoader`) stays hand-rolled — shadcn's registry has no
+spinner/loader equivalent, which is the actual "where applicable" carve-out.
+
+**Reason:** shadcn ships `input` and `alert` primitives with no Radix
+dependency, same as `button` — there's no reason to treat them differently
+once the "edit the copied-in file directly" pattern was settled for `Button`.
+Keeps all three consistent and matches the ticket's literal wording.
+
 ---
 
 ## Design
@@ -249,9 +265,9 @@ Applied as `className` on `<html>` (or `<body>`), exposing the CSS vars the
 - New `isLoading?: boolean` prop: renders `<Spinner>` absolutely centered, hides (not removes) children via `invisible`, forces `disabled` + `aria-busy="true"`.
 - Test coverage: each variant renders its class; `isLoading` disables the button, shows the spinner, and preserves rendered width (snapshot/computed-style check) — plus one interaction test (click fires `onClick` when not loading, does not fire while loading).
 
-**`Input`** (`components/Input/Input.tsx`): single glass-styled variant (`--radius-md`, `--blur-input`), forwards all native `<input>` props + `ref`. No visual error state in this ticket (errors surface via `Alert`); `aria-invalid` passthrough is free but unstyled.
+**`Input`** (`components/ui/input.tsx`, shadcn-generated then customized in place — same pattern as `Button`): single glass-styled variant (`--radius-md`, `--blur-input`), forwards all native `<input>` props + `ref`. No visual error state in this ticket (errors surface via `Alert`); `aria-invalid` passthrough is free but unstyled.
 
-**`Alert`** (`components/Alert/Alert.tsx`): `variant: "success" | "error"` (`--color-cyan-accent` / `--color-danger`), glass surface, text-only (no icons).
+**`Alert`** (`components/ui/alert.tsx`, shadcn-generated then customized in place): `variant: "success" | "error"` (`--color-cyan-accent` / `--color-danger`), glass surface, text-only (no icons).
 
 **`Loading`** (`components/Loading/`):
 - `Spinner.tsx`: ~18px CSS ring, `animate-spin`, `--color-violet-accent` stroke.
