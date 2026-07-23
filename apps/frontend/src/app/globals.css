@@ -73,6 +73,20 @@
   border-radius: var(--radius-md);
 }
 
+@keyframes chip-flip {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+.animate-chip-flip {
+  animation: chip-flip 1.2s linear infinite;
+  transform-style: preserve-3d;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
