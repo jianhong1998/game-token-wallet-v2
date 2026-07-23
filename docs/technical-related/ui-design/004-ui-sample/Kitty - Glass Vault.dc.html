@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0620;font-family:Manrope,system-ui,sans-serif}
+a{color:#67e8f9}
+a:hover{color:#a78bfa}
+input,select{font-family:Manrope,system-ui,sans-serif}
+input::placeholder{color:rgba(244,241,251,.35)}
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; justify-content: center; padding: 32px 16px; box-sizing: border-box; background-color: #583E94">
+<div style="width:390px;max-width:100%;min-height:800px;background:radial-gradient(circle at 18% 12%, rgba(139,92,246,.55), transparent 42%), radial-gradient(circle at 88% 78%, rgba(34,211,238,.45), transparent 46%), linear-gradient(160deg,#0b0620,#140a30);border-radius:32px;box-shadow:0 24px 60px -20px rgba(0,0,0,.6);overflow:hidden;position:relative;display:flex;flex-direction:column">
+
+<div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">
+
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+<div style="padding:64px 28px 28px;display:flex;flex-direction:column;min-height:760px;box-sizing:border-box">
+  <div style="font:800 30px Manrope;background:linear-gradient(90deg,#a78bfa,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent">Kitty</div>
+  <div style="font:600 13px/1.5 Manrope;color:rgba(244,241,251,.55);margin-top:8px">Tokenize your table — no wallet, no seed phrase, just a username and password.</div>
+  <form onSubmit="{{ submitLogin }}" style="margin-top:40px;display:flex;flex-direction:column;gap:14px">
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:6px">Username</div>
+      <input value="{{ loginUsername }}" onChange="{{ updateLoginUsername }}" placeholder="username" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 14px Manrope;color:#f4f1fb">
+    </div>
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:6px">Password</div>
+      <input type="password" value="{{ loginPassword }}" onChange="{{ updateLoginPassword }}" placeholder="password" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 14px Manrope;color:#f4f1fb">
+    </div>
+    <sc-if value="{{ hasAuthError }}"><div style="font:600 12px Manrope;color:#fb7185">{{ authError }}</div></sc-if>
+    <button type="submit" style="margin-top:6px;padding:15px 0;border:none;border-radius:16px;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 14px Manrope;cursor:pointer">Log in</button>
+  </form>
+  <div style="margin-top:14px;font:600 11.5px Manrope;color:rgba(244,241,251,.45)">Demo account prefilled — just hit Log in.</div>
+  <div style="flex:1"></div>
+  <div style="text-align:center;font:600 13px Manrope;color:rgba(244,241,251,.55)">New here? <a href="#" onClick="{{ goRegister }}" style="font-weight:700;text-decoration:none">Create an account</a></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isRegister }}" hint-placeholder-val="{{ false }}">
+<div style="padding:64px 28px 28px;display:flex;flex-direction:column;min-height:760px;box-sizing:border-box">
+  <div style="font:800 30px Manrope;color:#f4f1fb">Create account</div>
+  <div style="font:600 13px/1.5 Manrope;color:rgba(244,241,251,.55);margin-top:8px">8–20 characters, letters/numbers/basic symbols only.</div>
+  <form onSubmit="{{ submitRegister }}" style="margin-top:32px;display:flex;flex-direction:column;gap:14px">
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:6px">Username</div>
+      <input value="{{ registerUsername }}" onChange="{{ updateRegisterUsername }}" placeholder="username" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 14px Manrope;color:#f4f1fb">
+    </div>
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:6px">Password</div>
+      <input type="password" value="{{ registerPassword }}" onChange="{{ updateRegisterPassword }}" placeholder="password" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 14px Manrope;color:#f4f1fb">
+    </div>
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:6px">Confirm password</div>
+      <input type="password" value="{{ registerConfirm }}" onChange="{{ updateRegisterConfirm }}" placeholder="confirm password" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 14px Manrope;color:#f4f1fb">
+    </div>
+    <sc-if value="{{ hasAuthError }}"><div style="font:600 12px Manrope;color:#fb7185">{{ authError }}</div></sc-if>
+    <button type="submit" style="margin-top:6px;padding:15px 0;border:none;border-radius:16px;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 14px Manrope;cursor:pointer">Create account</button>
+  </form>
+  <div style="flex:1"></div>
+  <div style="text-align:center;font:600 13px Manrope;color:rgba(244,241,251,.55)">Already have an account? <a href="#" onClick="{{ goLogin }}" style="font-weight:700;text-decoration:none">Log in</a></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ false }}">
+<div style="padding:28px 20px 24px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="font:800 20px Manrope;color:#f4f1fb">Kitty</div>
+    <button onClick="{{ goAccount }}" style="width:38px;height:38px;border-radius:14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);color:#e4d9ff;display:flex;align-items:center;justify-content:center;font:800 13px Manrope;cursor:pointer">{{ initials }}</button>
+  </div>
+  <div style="margin-top:18px;padding:22px;border-radius:24px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(18px)">
+    <div style="font:700 11px Manrope;color:rgba(244,241,251,.6);text-transform:uppercase;letter-spacing:.06em">Total balance</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+      <img src="chip-icon.svg" alt="" style="width:28px;height:28px;filter:saturate(1.6) hue-rotate(220deg) brightness(1.3)">
+      <span style="font:700 34px 'Space Mono',monospace;background:linear-gradient(90deg,#a78bfa,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent">{{ totalBalanceFmt }}</span>
+    </div>
+    <div style="display:inline-block;margin-top:10px;padding:5px 12px;border-radius:20px;background:rgba(167,139,250,.18);color:#c4b5fd;font:700 10.5px Manrope">{{ yourGamesCountLabel }}</div>
+  </div>
+  <div style="margin-top:22px;font:800 13.5px Manrope;color:#f4f1fb">Your games</div>
+  <div style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+    <sc-for list="{{ yourGames }}" as="g" hint-placeholder-count="3">
+      <div onClick="{{ g.onOpen }}" style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(12px);cursor:pointer">
+        <div style="width:44px;height:44px;border-radius:14px;background:{{ g.modeTint }};display:flex;align-items:center;justify-content:center;font:800 11px Manrope;color:{{ g.modeText }}">{{ g.modeAbbr }}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font:800 13.5px Manrope;color:#f4f1fb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.name }}</div>
+          <div style="font:600 10.5px Manrope;color:rgba(244,241,251,.45);margin-top:3px">{{ g.playerCount }}/20 players</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px"><img src="chip-icon.svg" alt="" style="width:16px;height:16px;filter:saturate(1.6) hue-rotate(220deg) brightness(1.3)"><span style="font:700 14px 'Space Mono',monospace;color:#e4d9ff">{{ g.myBalanceFmt }}</span></div>
+      </div>
+    </sc-for>
+    <sc-if value="{{ noYourGames }}"><div style="padding:18px;text-align:center;font:600 12.5px Manrope;color:rgba(244,241,251,.45);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px">You haven't joined any games yet.</div></sc-if>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:22px">
+    <button onClick="{{ goCreate }}" style="flex:1;text-align:center;padding:14px 0;border-radius:18px;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 12.5px Manrope;border:none;cursor:pointer">+ Create</button>
+    <button onClick="{{ goBrowse }}" style="flex:1;text-align:center;padding:14px 0;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(10px);color:#f4f1fb;font:800 12.5px Manrope;cursor:pointer">Browse</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isBrowse }}" hint-placeholder-val="{{ false }}">
+<div style="padding:28px 20px 24px">
+  <div style="font:800 20px Manrope;color:#f4f1fb">Browse games</div>
+  <input value="{{ browseFilter }}" onChange="{{ updateBrowseFilter }}" placeholder="Search games…" style="margin-top:14px;width:100%;box-sizing:border-box;padding:12px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 13px Manrope;color:#f4f1fb">
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px">
+    <sc-for list="{{ browseGames }}" as="g" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(12px)">
+        <div style="width:44px;height:44px;border-radius:14px;background:{{ g.modeTint }};display:flex;align-items:center;justify-content:center;font:800 11px Manrope;color:{{ g.modeText }}">{{ g.modeAbbr }}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font:800 13.5px Manrope;color:#f4f1fb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.name }}</div>
+          <div style="font:600 10.5px Manrope;color:rgba(244,241,251,.45);margin-top:3px">{{ g.modeLabel }} · {{ g.playerCount }}/20 · {{ g.visibilityLabel }}</div>
+        </div>
+        <button onClick="{{ g.onAction }}" style="flex:none;padding:9px 14px;border-radius:12px;border:none;background:{{ g.actionBg }};color:{{ g.actionColor }};font:800 11.5px Manrope;cursor:pointer">{{ g.actionLabel }}</button>
+      </div>
+    </sc-for>
+    <sc-if value="{{ noBrowseGames }}"><div style="padding:18px;text-align:center;font:600 12.5px Manrope;color:rgba(244,241,251,.45);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px">No games match your search.</div></sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isCreate }}" hint-placeholder-val="{{ false }}">
+<div style="padding:24px 20px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <button onClick="{{ goHome }}" style="width:32px;height:32px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f4f1fb;font:700 16px Manrope;cursor:pointer">‹</button>
+    <div style="font:800 18px Manrope;color:#f4f1fb">Create a game</div>
+  </div>
+  <form onSubmit="{{ submitCreate }}" style="margin-top:20px;display:flex;flex-direction:column;gap:18px">
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:6px">Game name</div>
+      <input value="{{ createName }}" onChange="{{ updateCreateName }}" placeholder="e.g. Friday Poker Night" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 14px Manrope;color:#f4f1fb">
+    </div>
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:8px">Mode</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div onClick="{{ setCreateModeGeneral }}" style="padding:14px;border-radius:14px;cursor:pointer;background:{{ modeGeneralBg }};border:1.5px solid {{ modeGeneralBorder }};backdrop-filter:blur(8px)">
+          <div style="font:800 13px Manrope;color:#f4f1fb">General Mode</div>
+          <div style="font:600 11px Manrope;color:rgba(244,241,251,.5);margin-top:2px">Players transfer tokens directly to each other.</div>
+        </div>
+        <div onClick="{{ setCreateModePoker }}" style="padding:14px;border-radius:14px;cursor:pointer;background:{{ modePokerBg }};border:1.5px solid {{ modePokerBorder }};backdrop-filter:blur(8px)">
+          <div style="font:800 13px Manrope;color:#f4f1fb">Poker (Holdem) Mode</div>
+          <div style="font:600 11px Manrope;color:rgba(244,241,251,.5);margin-top:2px">Players contribute to a pot; admin declares winners.</div>
+        </div>
+        <div onClick="{{ setCreateModePool }}" style="padding:14px;border-radius:14px;cursor:pointer;background:{{ modePoolBg }};border:1.5px solid {{ modePoolBorder }};backdrop-filter:blur(8px)">
+          <div style="font:800 13px Manrope;color:#f4f1fb">General Pool Mode</div>
+          <div style="font:600 11px Manrope;color:rgba(244,241,251,.5);margin-top:2px">Everyone pays into one pool; admin pays out winners.</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font:700 11px Manrope;color:#f4f1fb;margin-bottom:8px">Visibility</div>
+      <div style="display:flex;gap:8px">
+        <div onClick="{{ setCreateVisibilityPublic }}" style="flex:1;text-align:center;padding:12px 0;border-radius:14px;cursor:pointer;background:{{ visPublicBg }};border:1.5px solid {{ visPublicBorder }};font:800 12.5px Manrope;color:#f4f1fb">Public</div>
+        <div onClick="{{ setCreateVisibilityPrivate }}" style="flex:1;text-align:center;padding:12px 0;border-radius:14px;cursor:pointer;background:{{ visPrivateBg }};border:1.5px solid {{ visPrivateBorder }};font:800 12.5px Manrope;color:#f4f1fb">Private</div>
+      </div>
+      <sc-if value="{{ createIsPrivate }}">
+        <input type="password" value="{{ createPassword }}" onChange="{{ updateCreatePassword }}" placeholder="Set a password" style="margin-top:10px;width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);backdrop-filter:blur(10px);font:600 14px Manrope;color:#f4f1fb">
+      </sc-if>
+    </div>
+    <sc-if value="{{ hasCreateError }}"><div style="font:600 12px Manrope;color:#fb7185">{{ createError }}</div></sc-if>
+    <button type="submit" style="padding:15px 0;border:none;border-radius:16px;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 14px Manrope;cursor:pointer">Create game</button>
+  </form>
+</div>
+</sc-if>
+
+<sc-if value="{{ isGame }}" hint-placeholder-val="{{ false }}">
+<div style="padding:24px 20px 90px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <button onClick="{{ goHome }}" style="width:32px;height:32px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f4f1fb;font:700 16px Manrope;cursor:pointer">‹</button>
+    <div style="flex:1;min-width:0">
+      <div style="font:800 17px Manrope;color:#f4f1fb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ selGame.name }}</div>
+      <div style="font:700 10.5px Manrope;color:{{ selGame.modeText }};margin-top:1px">{{ selGame.modeLabel }}</div>
+    </div>
+    <sc-if value="{{ isGameAdmin }}"><div style="padding:5px 10px;border-radius:20px;background:rgba(167,139,250,.18);color:#c4b5fd;font:800 10px Manrope;flex:none">Admin</div></sc-if>
+  </div>
+
+  <div style="margin-top:16px;padding:20px;border-radius:22px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(18px)">
+    <div style="font:700 10.5px Manrope;color:rgba(244,241,251,.6);text-transform:uppercase;letter-spacing:.06em">Your balance</div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:5px">
+      <img src="chip-icon.svg" alt="" style="width:22px;height:22px;filter:saturate(1.6) hue-rotate(220deg) brightness(1.3)">
+      <span style="font:700 26px 'Space Mono',monospace;background:linear-gradient(90deg,#a78bfa,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent">{{ myBalanceFmt }}</span>
+    </div>
+  </div>
+
+  <sc-if value="{{ gameIsGeneral }}">
+    <div style="margin-top:20px;font:800 13.5px Manrope;color:#f4f1fb">Players</div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ selGame.players }}" as="p" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)">
+          <div style="font:700 12.5px Manrope;color:#f4f1fb">{{ p.label }}</div>
+          <div style="display:flex;align-items:center;gap:6px"><img src="chip-icon.svg" alt="" style="width:14px;height:14px;filter:saturate(1.6) hue-rotate(220deg) brightness(1.3)"><span style="font:700 13px 'Space Mono',monospace;color:#f4f1fb">{{ p.balanceFmt }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:20px;font:800 13.5px Manrope;color:#f4f1fb">Send tokens</div>
+    <form onSubmit="{{ submitTransfer }}" style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ transferRows }}" as="row" hint-placeholder-count="1">
+        <div style="display:flex;gap:8px;align-items:center">
+          <select value="{{ row.username }}" onChange="{{ row.onUsernameChange }}" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px Manrope;color:#f4f1fb">
+            <option value="">Select player…</option>
+            <sc-for list="{{ row.otherPlayers }}" as="op" hint-placeholder-count="2"><option value="{{ op.username }}">{{ op.username }}</option></sc-for>
+          </select>
+          <input type="number" step="0.01" value="{{ row.amount }}" onChange="{{ row.onAmountChange }}" placeholder="0.00" style="width:88px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px 'Space Mono',monospace;color:#f4f1fb">
+          <sc-if value="{{ row.canRemove }}"><button type="button" onClick="{{ row.onRemove }}" style="width:32px;height:32px;flex:none;border-radius:10px;border:none;background:rgba(251,113,133,.14);color:#fb7185;font:700 14px Manrope;cursor:pointer">×</button></sc-if>
+        </div>
+      </sc-for>
+      <button type="button" onClick="{{ addRecipientRow }}" style="align-self:flex-start;padding:8px 14px;border-radius:12px;border:1px dashed rgba(255,255,255,.3);background:transparent;color:#f4f1fb;font:700 11.5px Manrope;cursor:pointer">+ Add recipient</button>
+      <sc-if value="{{ hasTransferError }}"><div style="font:600 12px Manrope;color:#fb7185">{{ transferError }}</div></sc-if>
+      <button type="submit" style="padding:14px 0;border:none;border-radius:14px;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 13px Manrope;cursor:pointer">Send {{ transferTotalFmt }}</button>
+    </form>
+  </sc-if>
+
+  <sc-if value="{{ gameIsPoker }}">
+    <div style="margin-top:20px;padding:18px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(12px)">
+      <div style="font:700 11px Manrope;color:rgba(244,241,251,.5);text-transform:uppercase;letter-spacing:.05em">Pot</div>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><img src="chip-icon.svg" alt="" style="width:20px;height:20px;filter:saturate(1.6) hue-rotate(220deg) brightness(1.3)"><span style="font:700 24px 'Space Mono',monospace;color:#f4f1fb">{{ selGame.potTotalFmt }}</span></div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ contributors }}" as="c" hint-placeholder-count="2">
+          <div style="display:flex;justify-content:space-between;font:600 11.5px Manrope;color:rgba(244,241,251,.55)">
+            <span>{{ c.username }}<sc-if value="{{ c.isShowhand }}"> · all in</sc-if></span>
+            <span style="font-family:'Space Mono',monospace">{{ c.amountFmt }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <form onSubmit="{{ contributeToPot }}" style="margin-top:12px;display:flex;gap:8px">
+      <input type="number" step="0.01" value="{{ potAmount }}" onChange="{{ updatePotAmount }}" placeholder="Amount to add" style="flex:1;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px 'Space Mono',monospace;color:#f4f1fb">
+      <button type="submit" style="padding:13px 16px;border:none;border-radius:12px;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 12px Manrope;cursor:pointer">Add</button>
+    </form>
+    <button onClick="{{ showhand }}" style="margin-top:8px;width:100%;padding:13px 0;border-radius:12px;border:1.5px solid #a78bfa;background:rgba(167,139,250,.12);color:#c4b5fd;font:800 12.5px Manrope;cursor:pointer">Show hand (go all in)</button>
+
+    <sc-if value="{{ isGameAdmin }}">
+      <div style="margin-top:24px;padding:16px;border-radius:18px;border:1.5px solid rgba(167,139,250,.5);background:rgba(167,139,250,.08)">
+        <div style="font:800 12.5px Manrope;color:#c4b5fd">Declare winners</div>
+        <sc-if value="{{ noContributors }}"><div style="margin-top:8px;font:600 11.5px Manrope;color:rgba(244,241,251,.45)">No contributions yet this round.</div></sc-if>
+        <sc-if value="{{ hasContributors }}">
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ contributors }}" as="c" hint-placeholder-count="2">
+              <div onClick="{{ c.onToggle }}" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:12px;cursor:pointer;background:{{ c.selBg }};border:1.5px solid {{ c.selBorder }}">
+                <span style="font:700 12px Manrope;color:#f4f1fb">{{ c.username }}</span>
+                <span style="font:700 11px Manrope;color:{{ c.selColor }}">{{ c.selLabel }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ hasWinnerShare }}"><div style="margin-top:8px;font:600 11.5px Manrope;color:rgba(244,241,251,.55)">Each winner gets {{ declareShareFmt }}</div></sc-if>
+          <button onClick="{{ declareWinners }}" style="margin-top:10px;width:100%;padding:13px 0;border-radius:12px;border:none;background:linear-gradient(90deg,#a78bfa,#c4b5fd);color:#0b0620;font:800 12.5px Manrope;cursor:pointer">Pay out pot</button>
+        </sc-if>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ gameIsPool }}">
+    <div style="margin-top:20px;padding:18px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(12px)">
+      <div style="font:700 11px Manrope;color:rgba(244,241,251,.5);text-transform:uppercase;letter-spacing:.05em">Pool</div>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><img src="chip-icon.svg" alt="" style="width:20px;height:20px;filter:saturate(1.6) hue-rotate(220deg) brightness(1.3)"><span style="font:700 24px 'Space Mono',monospace;color:#f4f1fb">{{ selGame.poolTotalFmt }}</span></div>
+    </div>
+    <form onSubmit="{{ contributeToPool }}" style="margin-top:12px;display:flex;gap:8px">
+      <input type="number" step="0.01" value="{{ poolAmount }}" onChange="{{ updatePoolAmount }}" placeholder="Amount to add" style="flex:1;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px 'Space Mono',monospace;color:#f4f1fb">
+      <button type="submit" style="padding:13px 16px;border:none;border-radius:12px;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 12px Manrope;cursor:pointer">Add</button>
+    </form>
+
+    <sc-if value="{{ isGameAdmin }}">
+      <button onClick="{{ openPayoutModal }}" style="margin-top:16px;width:100%;padding:14px 0;border-radius:14px;border:1.5px solid #a78bfa;background:rgba(167,139,250,.1);color:#c4b5fd;font:800 12.5px Manrope;cursor:pointer">Pay out pool</button>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isGameAdmin }}">
+    <button onClick="{{ openAdminModal }}" style="margin-top: 16px; width: 100%; padding: 15px 0; border: 1.5px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: #f4f1fb; font: 800 12.5px Manrope; cursor: pointer; border-radius: 14px">Admin controls</button>
+  </sc-if>
+
+  <sc-if value="{{ hasActivity }}">
+    <button onClick="{{ openQuitConfirm }}" style="margin-top:16px;width:100%;padding:13px 0;border-radius:12px;border:none;background:transparent;color:#fb7185;font:700 12.5px Manrope;cursor:pointer">Quit game</button><div style="margin-top:24px;font:800 13.5px Manrope;color:#f4f1fb">Activity</div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ selGame.activity }}" as="a" hint-placeholder-count="2">
+        <div style="font:600 11.5px/1.4 Manrope;color:rgba(244,241,251,.55);padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.1)">{{ a.text }}</div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  
+</div>
+</sc-if>
+
+<sc-if value="{{ isAccount }}" hint-placeholder-val="{{ false }}">
+<div style="padding:28px 20px 24px">
+  <div style="font:800 20px Manrope;color:#f4f1fb">Account</div>
+  <div style="margin-top:18px;display:flex;align-items:center;gap:14px;padding:18px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(12px)">
+    <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#8b5cf6,#22d3ee);color:#0b0620;display:flex;align-items:center;justify-content:center;font:800 16px Manrope">{{ initials }}</div>
+    <div>
+      <div style="font:800 15px Manrope;color:#f4f1fb">{{ currentUsername }}</div>
+      <div style="font:600 11px Manrope;color:rgba(244,241,251,.45);margin-top:2px">{{ yourGamesCountLabel }}</div>
+    </div>
+  </div>
+  <button onClick="{{ logout }}" style="margin-top:20px;width:100%;padding:14px 0;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f4f1fb;font:800 13px Manrope;cursor:pointer">Log out</button>
+  <div style="margin-top:28px;padding:16px;border-radius:16px;border:1.5px solid rgba(251,113,133,.35)">
+    <div style="font:800 12px Manrope;color:#fb7185">Danger zone</div>
+    <div style="font:600 11px/1.5 Manrope;color:rgba(244,241,251,.5);margin-top:4px">Leave or close all your games first — an account still holding a game membership can't be deleted.</div>
+    <button onClick="{{ openDeleteConfirm }}" style="margin-top:10px;width:100%;padding:12px 0;border-radius:12px;border:none;background:#fb7185;color:#0b0620;font:800 12px Manrope;cursor:pointer">Delete account</button>
+  </div>
+</div>
+</sc-if>
+
+</div>
+
+<sc-if value="{{ showNav }}">
+<div style="flex:none;display:flex;border-top:1px solid rgba(255,255,255,.12);background:rgba(11,6,32,.6);backdrop-filter:blur(16px)">
+  <button onClick="{{ goHome }}" style="flex:1;padding:12px 0 14px;border:none;background:transparent;color:{{ navHomeColor }};font:800 11.5px Manrope;cursor:pointer">Home</button>
+  <button onClick="{{ goBrowse }}" style="flex:1;padding:12px 0 14px;border:none;background:transparent;color:{{ navBrowseColor }};font:800 11.5px Manrope;cursor:pointer">Browse</button>
+  <button onClick="{{ goAccount }}" style="flex:1;padding:12px 0 14px;border:none;background:transparent;color:{{ navAccountColor }};font:800 11.5px Manrope;cursor:pointer">You</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasToast }}">
+<div style="position:absolute;left:20px;right:20px;bottom:{{ toastBottom }};padding:12px 16px;border-radius:14px;background:rgba(20,10,48,.9);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(12px);color:#f4f1fb;font:700 12px Manrope;text-align:center;box-shadow:0 8px 20px -6px rgba(0,0,0,.5);z-index:20">{{ toast }}</div>
+</sc-if>
+
+<sc-if value="{{ joinModalOpen }}">
+<div style="position:absolute;inset:0;background:rgba(5,2,15,.7);display:flex;align-items:center;justify-content:center;padding:24px;z-index:30">
+  <div style="width:100%;background:linear-gradient(160deg,#140a30,#1c1040);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px">
+    <div style="font:800 15px Manrope;color:#f4f1fb">{{ joinGameName }}</div>
+    <div style="font:600 11.5px Manrope;color:rgba(244,241,251,.5);margin-top:4px">This is a private game. Enter the password to join.</div>
+    <form onSubmit="{{ submitJoinPassword }}" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+      <input type="password" value="{{ joinPassword }}" onChange="{{ updateJoinPassword }}" placeholder="Password" style="width:100%;box-sizing:border-box;padding:13px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 13px Manrope;color:#f4f1fb">
+      <sc-if value="{{ hasJoinError }}"><div style="font:600 12px Manrope;color:#fb7185">{{ joinError }}</div></sc-if>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button type="button" onClick="{{ closeJoinModal }}" style="flex:1;padding:12px 0;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f4f1fb;font:800 12.5px Manrope;cursor:pointer">Cancel</button>
+        <button type="submit" style="flex:1;padding:12px 0;border-radius:12px;border:none;background:linear-gradient(90deg,#8b5cf6,#22d3ee);color:#0b0620;font:800 12.5px Manrope;cursor:pointer">Join</button>
+      </div>
+    </form>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ adminModalOpen }}">
+<div style="position:absolute;inset:0;background:rgba(5,2,15,.7);display:flex;align-items:center;justify-content:center;padding:24px;z-index:30">
+  <div style="width:100%;max-height:80%;overflow-y:auto;background:linear-gradient(160deg,#140a30,#1c1040);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px;box-sizing:border-box">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font:800 15px Manrope;color:#f4f1fb">Admin controls</div>
+      <button onClick="{{ closeAdminModal }}" style="width:28px;height:28px;border-radius:9px;border:none;background:rgba(255,255,255,.1);color:#f4f1fb;font:700 14px Manrope;cursor:pointer">×</button>
+    </div>
+    <form onSubmit="{{ submitMint }}" style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 10.5px Manrope;color:rgba(244,241,251,.5)">Deposit for offline cash-in</div>
+      <select value="{{ mintUsername }}" onChange="{{ updateMintUsername }}" style="padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px Manrope;color:#f4f1fb">
+        <option value="">Select player…</option>
+        <sc-for list="{{ selGame.players }}" as="p" hint-placeholder-count="2"><option value="{{ p.username }}">{{ p.username }}</option></sc-for>
+      </select>
+      <div style="display:flex;gap:8px">
+        <input type="number" step="0.01" value="{{ mintAmount }}" onChange="{{ updateMintAmount }}" placeholder="Amount" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px 'Space Mono',monospace;color:#f4f1fb">
+        <button type="submit" style="padding:12px 16px;border:none;border-radius:12px;background:rgba(255,255,255,.14);color:#f4f1fb;font:800 12px Manrope;cursor:pointer">Deposit</button>
+      </div>
+    </form>
+    <form onSubmit="{{ submitAdminTransfer }}" style="margin-top: 24px; display: flex; flex-direction: column; gap: 8px">
+      <div style="font:700 10.5px Manrope;color:rgba(244,241,251,.5)">Transfer admin role</div>
+      <div style="display:flex;gap:8px">
+        <select value="{{ adminTransferUsername }}" onChange="{{ updateAdminTransferUsername }}" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px Manrope;color:#f4f1fb">
+          <option value="">Select player…</option>
+          <sc-for list="{{ otherPlayersForAdmin }}" as="p" hint-placeholder-count="2"><option value="{{ p.username }}">{{ p.username }}</option></sc-for>
+        </select>
+        <button type="submit" style="padding: 12px 16px; border: none; border-radius: 12px; color: #fb7185; font: 800 12px Manrope; cursor: pointer; border-color: #fb7185; background-color: rgba(251,113,133,.1); border-width: 1.5px; border-style: solid">Transfer</button>
+      </div>
+    </form>
+    <button onClick="{{ openCloseConfirm }}" style="margin-top: 24px; width: 100%; padding: 13px 0; border-radius: 12px; border: 1.5px solid #fb7185; background: rgba(251,113,133,.08); color: #fb7185; font: 800 12.5px Manrope; cursor: pointer">Close game</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ payoutModalOpen }}">
+<div style="position:absolute;inset:0;background:rgba(5,2,15,.7);display:flex;align-items:center;justify-content:center;padding:24px;z-index:30">
+  <div style="width:100%;background:linear-gradient(160deg,#140a30,#1c1040);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font:800 15px Manrope;color:#c4b5fd">Pay out pool</div>
+      <button onClick="{{ closePayoutModal }}" style="width:28px;height:28px;border-radius:9px;border:none;background:rgba(255,255,255,.1);color:#f4f1fb;font:700 14px Manrope;cursor:pointer">×</button>
+    </div>
+    <form onSubmit="{{ submitPayout }}" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+      <select value="{{ payoutUsername }}" onChange="{{ updatePayoutUsername }}" style="padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px Manrope;color:#f4f1fb">
+        <option value="">Select player…</option>
+        <sc-for list="{{ selGame.players }}" as="p" hint-placeholder-count="2"><option value="{{ p.username }}">{{ p.username }}</option></sc-for>
+      </select>
+      <div style="display:flex;gap:8px">
+        <input type="number" step="0.01" value="{{ payoutAmount }}" onChange="{{ updatePayoutAmount }}" placeholder="Amount" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);font:600 12.5px 'Space Mono',monospace;color:#f4f1fb">
+        <button type="submit" style="padding:12px 16px;border:none;border-radius:12px;background:linear-gradient(90deg,#a78bfa,#c4b5fd);color:#0b0620;font:800 12px Manrope;cursor:pointer">Pay out</button>
+      </div>
+    </form>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ quitConfirmOpen }}">
+<div style="position:absolute;inset:0;background:rgba(5,2,15,.7);display:flex;align-items:center;justify-content:center;padding:24px;z-index:30">
+  <div style="width:100%;background:linear-gradient(160deg,#140a30,#1c1040);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px">
+    <div style="font:800 15px Manrope;color:#f4f1fb">Quit this game?</div>
+    <div style="font:600 11.5px Manrope;color:rgba(244,241,251,.5);margin-top:4px">Your balance in this game will be burned immediately and can't be recovered.</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onClick="{{ closeQuitConfirm }}" style="flex:1;padding:12px 0;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f4f1fb;font:800 12.5px Manrope;cursor:pointer">Cancel</button>
+      <button onClick="{{ confirmQuit }}" style="flex:1;padding:12px 0;border-radius:12px;border:none;background:#fb7185;color:#0b0620;font:800 12.5px Manrope;cursor:pointer">Quit</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ closeConfirmOpen }}">
+<div style="position:absolute;inset:0;background:rgba(5,2,15,.7);display:flex;align-items:center;justify-content:center;padding:24px;z-index:30">
+  <div style="width:100%;background:linear-gradient(160deg,#140a30,#1c1040);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px">
+    <div style="font:800 15px Manrope;color:#f4f1fb">Close this game?</div>
+    <div style="font:600 11.5px Manrope;color:rgba(244,241,251,.5);margin-top:4px">All player balances and pot/pool funds will be burned. This can't be undone.</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onClick="{{ closeCloseConfirm }}" style="flex:1;padding:12px 0;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f4f1fb;font:800 12.5px Manrope;cursor:pointer">Cancel</button>
+      <button onClick="{{ confirmClose }}" style="flex:1;padding:12px 0;border-radius:12px;border:none;background:#fb7185;color:#0b0620;font:800 12.5px Manrope;cursor:pointer">Close game</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ deleteConfirmOpen }}">
+<div style="position:absolute;inset:0;background:rgba(5,2,15,.7);display:flex;align-items:center;justify-content:center;padding:24px;z-index:30">
+  <div style="width:100%;background:linear-gradient(160deg,#140a30,#1c1040);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px">
+    <div style="font:800 15px Manrope;color:#f4f1fb">Delete your account?</div>
+    <div style="font:600 11.5px Manrope;color:rgba(244,241,251,.5);margin-top:4px">This can't be undone. You must leave or close all games first.</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onClick="{{ closeDeleteConfirm }}" style="flex:1;padding:12px 0;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f4f1fb;font:800 12.5px Manrope;cursor:pointer">Cancel</button>
+      <button onClick="{{ confirmDelete }}" style="flex:1;padding:12px 0;border-radius:12px;border:none;background:#fb7185;color:#0b0620;font:800 12.5px Manrope;cursor:pointer">Delete</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    screen: 'login',
+    currentUsername: null,
+    toast: '',
+    loginForm: { username: 'alex', password: 'password123' },
+    registerForm: { username: '', password: '', confirm: '' },
+    authError: '',
+    users: { alex: { password: 'password123' } },
+    games: [
+      { id: 'g1', name: 'Friday Poker Night', mode: 'poker', visibility: 'public', password: null, admin: 'alex', closed: false,
+        players: [{ username: 'alex', balance: 420 }, { username: 'sam', balance: 380 }, { username: 'priya', balance: 420 }],
+        pot: { total: 0, contributions: {}, showhand: {} }, activity: [] },
+      { id: 'g2', name: 'Mahjong Sundays', mode: 'general', visibility: 'public', password: null, admin: 'sam', closed: false,
+        players: [{ username: 'alex', balance: 840 }, { username: 'sam', balance: 210 }, { username: 'mei', balance: 150 }], activity: [] },
+      { id: 'g3', name: 'Office Kopi Fund', mode: 'pool', visibility: 'private', password: 'kopi123', admin: 'alex', closed: false,
+        players: [{ username: 'alex', balance: 1422.5 }, { username: 'sam', balance: 0 }], pool: { total: 300 }, activity: [] },
+      { id: 'g4', name: 'Weekend Cash Game', mode: 'general', visibility: 'public', password: null, admin: 'mei', closed: false,
+        players: [{ username: 'mei', balance: 100 }], activity: [] },
+      { id: 'g5', name: 'VIP Room', mode: 'poker', visibility: 'private', password: 'vip2026', admin: 'priya', closed: false,
+        players: [{ username: 'priya', balance: 600 }], pot: { total: 0, contributions: {}, showhand: {} }, activity: [] }
+    ],
+    selectedGameId: null,
+    createForm: { name: '', mode: 'general', visibility: 'public', password: '' },
+    createError: '',
+    browseFilter: '',
+    joinModal: null,
+    transferForm: { recipients: [{ username: '', amount: '' }] },
+    transferError: '',
+    potForm: { amount: '' },
+    poolForm: { amount: '' },
+    mintForm: { username: '', amount: '' },
+    payoutForm: { username: '', amount: '' },
+    adminTransferForm: { username: '' },
+    winnersSelected: [],
+    adminModalOpen: false,
+    payoutModalOpen: false,
+    quitConfirmOpen: false,
+    closeConfirmOpen: false,
+    deleteConfirmOpen: false
+  };
+
+  formatMoney(n) {
+    const v = Number(n);
+    return (isNaN(v) ? 0 : v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  showToast = (msg) => {
+    this.setState({ toast: msg });
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => this.setState({ toast: '' }), 2400);
+  };
+
+  goHome = () => this.setState({ screen: 'home', joinModal: null });
+  goBrowse = () => this.setState({ screen: 'browse', joinModal: null });
+  goAccount = () => this.setState({ screen: 'account', joinModal: null });
+  goCreate = () => this.setState({ screen: 'create', createError: '' });
+  goLogin = (e) => { if (e) e.preventDefault(); this.setState({ screen: 'login', authError: '' }); };
+  goRegister = (e) => { if (e) e.preventDefault(); this.setState({ screen: 'register', authError: '' }); };
+
+  updateLoginUsername = (e) => this.setState(s => ({ loginForm: { ...s.loginForm, username: e.target.value }, authError: '' }));
+  updateLoginPassword = (e) => this.setState(s => ({ loginForm: { ...s.loginForm, password: e.target.value }, authError: '' }));
+  updateRegisterUsername = (e) => this.setState(s => ({ registerForm: { ...s.registerForm, username: e.target.value }, authError: '' }));
+  updateRegisterPassword = (e) => this.setState(s => ({ registerForm: { ...s.registerForm, password: e.target.value }, authError: '' }));
+  updateRegisterConfirm = (e) => this.setState(s => ({ registerForm: { ...s.registerForm, confirm: e.target.value }, authError: '' }));
+
+  submitLogin = (e) => {
+    e.preventDefault();
+    const { username, password } = this.state.loginForm;
+    const user = this.state.users[username];
+    if (!user || user.password !== password) { this.setState({ authError: 'Incorrect username or password.' }); return; }
+    this.setState({ currentUsername: username, screen: 'home', authError: '' });
+  };
+
+  submitRegister = (e) => {
+    e.preventDefault();
+    const { username, password, confirm } = this.state.registerForm;
+    if (!username.trim()) { this.setState({ authError: 'Username is required.' }); return; }
+    if (this.state.users[username]) { this.setState({ authError: 'That username is already taken.' }); return; }
+    if (password.length < 8 || password.length > 20) { this.setState({ authError: 'Password must be 8–20 characters.' }); return; }
+    if (!/^[A-Za-z0-9@#.,\-+_!$%^&*()]+$/.test(password)) { this.setState({ authError: 'Password can only contain letters, numbers and basic symbols.' }); return; }
+    if (password !== confirm) { this.setState({ authError: 'Passwords do not match.' }); return; }
+    this.setState(s => ({
+      users: { ...s.users, [username]: { password } },
+      currentUsername: username, screen: 'home',
+      registerForm: { username: '', password: '', confirm: '' }, authError: ''
+    }));
+  };
+
+  logout = () => this.setState({ currentUsername: null, screen: 'login' });
+
+  openGame = (gameId) => this.setState({
+    selectedGameId: gameId, screen: 'game', winnersSelected: [],
+    transferForm: { recipients: [{ username: '', amount: '' }] }, transferError: ''
+  });
+
+  requestJoin = (game) => {
+    const already = game.players.some(p => p.username === this.state.currentUsername);
+    if (already) { this.openGame(game.id); return; }
+    if (game.visibility === 'private') { this.setState({ joinModal: { gameId: game.id, password: '', error: '' } }); }
+    else { this.doJoin(game.id); }
+  };
+
+  doJoin = (gameId) => {
+    this.setState(s => ({
+      games: s.games.map(g => g.id === gameId ? { ...g, players: [...g.players, { username: s.currentUsername, balance: 0 }] } : g),
+      joinModal: null
+    }), () => this.openGame(gameId));
+  };
+
+  updateJoinPassword = (e) => this.setState(s => ({ joinModal: { ...s.joinModal, password: e.target.value, error: '' } }));
+  closeJoinModal = () => this.setState({ joinModal: null });
+  submitJoinPassword = (e) => {
+    e.preventDefault();
+    const game = this.state.games.find(g => g.id === this.state.joinModal.gameId);
+    if (game.password !== this.state.joinModal.password) { this.setState(s => ({ joinModal: { ...s.joinModal, error: 'Incorrect password.' } })); return; }
+    this.doJoin(game.id);
+  };
+
+  updateCreateName = (e) => this.setState(s => ({ createForm: { ...s.createForm, name: e.target.value }, createError: '' }));
+  updateCreatePassword = (e) => this.setState(s => ({ createForm: { ...s.createForm, password: e.target.value }, createError: '' }));
+  setCreateModeGeneral = () => this.setState(s => ({ createForm: { ...s.createForm, mode: 'general' } }));
+  setCreateModePoker = () => this.setState(s => ({ createForm: { ...s.createForm, mode: 'poker' } }));
+  setCreateModePool = () => this.setState(s => ({ createForm: { ...s.createForm, mode: 'pool' } }));
+  setCreateVisibilityPublic = () => this.setState(s => ({ createForm: { ...s.createForm, visibility: 'public' } }));
+  setCreateVisibilityPrivate = () => this.setState(s => ({ createForm: { ...s.createForm, visibility: 'private' } }));
+
+  submitCreate = (e) => {
+    e.preventDefault();
+    const { name, mode, visibility, password } = this.state.createForm;
+    if (!name.trim()) { this.setState({ createError: 'Give your game a name.' }); return; }
+    if (visibility === 'private' && !password.trim()) { this.setState({ createError: 'Set a password for a private game.' }); return; }
+    const id = 'g' + Date.now();
+    const newGame = {
+      id, name: name.trim(), mode, visibility, password: visibility === 'private' ? password : null,
+      admin: this.state.currentUsername, closed: false,
+      players: [{ username: this.state.currentUsername, balance: 0 }], activity: [],
+      ...(mode === 'poker' ? { pot: { total: 0, contributions: {}, showhand: {} } } : {}),
+      ...(mode === 'pool' ? { pool: { total: 0 } } : {})
+    };
+    this.setState(s => ({ games: [...s.games, newGame], createForm: { name: '', mode: 'general', visibility: 'public', password: '' } }), () => this.openGame(id));
+  };
+
+  updateBrowseFilter = (e) => this.setState({ browseFilter: e.target.value });
+
+  updateGame = (updater) => this.setState(s => ({ games: s.games.map(g => g.id === s.selectedGameId ? updater(g) : g) }));
+  logActivity = (game, text) => ({ ...game, activity: [{ text }, ...game.activity].slice(0, 20) });
+
+  addRecipientRow = () => this.setState(s => ({ transferForm: { recipients: [...s.transferForm.recipients, { username: '', amount: '' }] } }));
+  removeRecipientRow = (idx) => this.setState(s => ({ transferForm: { recipients: s.transferForm.recipients.filter((_, i) => i !== idx) } }));
+  updateRecipientRow = (idx, field, value) => this.setState(s => ({ transferForm: { recipients: s.transferForm.recipients.map((r, i) => i === idx ? { ...r, [field]: value } : r) } }));
+
+  submitTransfer = (e) => {
+    e.preventDefault();
+    const game = this.state.games.find(g => g.id === this.state.selectedGameId);
+    const me = game.players.find(p => p.username === this.state.currentUsername);
+    const rows = this.state.transferForm.recipients.filter(r => r.username && Number(r.amount) > 0);
+    if (!rows.length) { this.setState({ transferError: 'Add at least one recipient and amount.' }); return; }
+    const total = rows.reduce((sum, r) => sum + Number(r.amount), 0);
+    if (total > me.balance) { this.setState({ transferError: 'Not enough balance for this transfer.' }); return; }
+    this.updateGame(g => {
+      const players = g.players.map(p => {
+        if (p.username === this.state.currentUsername) return { ...p, balance: p.balance - total };
+        const row = rows.find(r => r.username === p.username);
+        return row ? { ...p, balance: p.balance + Number(row.amount) } : p;
+      });
+      const text = `${this.state.currentUsername} sent ${rows.map(r => `${this.formatMoney(Number(r.amount))} to ${r.username}`).join(', ')}`;
+      return this.logActivity({ ...g, players }, text);
+    });
+    this.setState({ transferForm: { recipients: [{ username: '', amount: '' }] }, transferError: '' });
+    this.showToast('Transfer sent.');
+  };
+
+  updatePotAmount = (e) => this.setState({ potForm: { amount: e.target.value } });
+  contributeToPot = (e) => {
+    e.preventDefault();
+    const amount = Number(this.state.potForm.amount);
+    const game = this.state.games.find(g => g.id === this.state.selectedGameId);
+    const me = game.players.find(p => p.username === this.state.currentUsername);
+    if (!amount || amount <= 0 || amount > me.balance) { this.showToast('Enter a valid amount.'); return; }
+    this.updateGame(g => {
+      const players = g.players.map(p => p.username === this.state.currentUsername ? { ...p, balance: p.balance - amount } : p);
+      const contributions = { ...g.pot.contributions, [this.state.currentUsername]: (g.pot.contributions[this.state.currentUsername] || 0) + amount };
+      const pot = { ...g.pot, total: g.pot.total + amount, contributions };
+      return this.logActivity({ ...g, players, pot }, `${this.state.currentUsername} added ${this.formatMoney(amount)} to the pot`);
+    });
+    this.setState({ potForm: { amount: '' } });
+  };
+
+  showhand = () => {
+    const game = this.state.games.find(g => g.id === this.state.selectedGameId);
+    const me = game.players.find(p => p.username === this.state.currentUsername);
+    if (!me || me.balance <= 0) { this.showToast('Nothing left to show hand with.'); return; }
+    const amount = me.balance;
+    this.updateGame(g => {
+      const players = g.players.map(p => p.username === this.state.currentUsername ? { ...p, balance: 0 } : p);
+      const contributions = { ...g.pot.contributions, [this.state.currentUsername]: (g.pot.contributions[this.state.currentUsername] || 0) + amount };
+      const showhandMap = { ...g.pot.showhand, [this.state.currentUsername]: true };
+      const pot = { ...g.pot, total: g.pot.total + amount, contributions, showhand: showhandMap };
+      return this.logActivity({ ...g, players, pot }, `${this.state.currentUsername} showed hand — all in for ${this.formatMoney(amount)}`);
+    });
+  };
+
+  toggleWinner = (username) => this.setState(s => ({
+    winnersSelected: s.winnersSelected.includes(username) ? s.winnersSelected.filter(u => u !== username) : [...s.winnersSelected, username]
+  }));
+
+  declareWinners = () => {
+    const winners = this.state.winnersSelected;
+    if (!winners.length) { this.showToast('Select at least one winner.'); return; }
+    this.updateGame(g => {
+      const share = g.pot.total / winners.length;
+      const players = g.players.map(p => winners.includes(p.username) ? { ...p, balance: p.balance + share } : p);
+      const pot = { total: 0, contributions: {}, showhand: {} };
+      return this.logActivity({ ...g, players, pot }, `Round settled — ${winners.join(', ')} split ${this.formatMoney(g.pot.total)}`);
+    });
+    this.setState({ winnersSelected: [] });
+    this.showToast('Winners paid out.');
+  };
+
+  updatePoolAmount = (e) => this.setState({ poolForm: { amount: e.target.value } });
+  contributeToPool = (e) => {
+    e.preventDefault();
+    const amount = Number(this.state.poolForm.amount);
+    const game = this.state.games.find(g => g.id === this.state.selectedGameId);
+    const me = game.players.find(p => p.username === this.state.currentUsername);
+    if (!amount || amount <= 0 || amount > me.balance) { this.showToast('Enter a valid amount.'); return; }
+    this.updateGame(g => {
+      const players = g.players.map(p => p.username === this.state.currentUsername ? { ...p, balance: p.balance - amount } : p);
+      const pool = { total: g.pool.total + amount };
+      return this.logActivity({ ...g, players, pool }, `${this.state.currentUsername} added ${this.formatMoney(amount)} to the pool`);
+    });
+    this.setState({ poolForm: { amount: '' } });
+  };
+
+  updatePayoutUsername = (e) => this.setState(s => ({ payoutForm: { ...s.payoutForm, username: e.target.value } }));
+  updatePayoutAmount = (e) => this.setState(s => ({ payoutForm: { ...s.payoutForm, amount: e.target.value } }));
+  submitPayout = (e) => {
+    e.preventDefault();
+    const { username, amount } = this.state.payoutForm;
+    const amt = Number(amount);
+    const game = this.state.games.find(g => g.id === this.state.selectedGameId);
+    if (!username || !amt || amt <= 0 || amt > game.pool.total) { this.showToast('Enter a valid player and amount.'); return; }
+    this.updateGame(g => {
+      const players = g.players.map(p => p.username === username ? { ...p, balance: p.balance + amt } : p);
+      const pool = { total: g.pool.total - amt };
+      return this.logActivity({ ...g, players, pool }, `Admin paid out ${this.formatMoney(amt)} to ${username}`);
+    });
+    this.setState({ payoutForm: { username: '', amount: '' }, payoutModalOpen: false });
+    this.showToast('Payout sent.');
+  };
+
+  updateMintUsername = (e) => this.setState(s => ({ mintForm: { ...s.mintForm, username: e.target.value } }));
+  updateMintAmount = (e) => this.setState(s => ({ mintForm: { ...s.mintForm, amount: e.target.value } }));
+  submitMint = (e) => {
+    e.preventDefault();
+    const { username, amount } = this.state.mintForm;
+    const amt = Number(amount);
+    if (!username || !amt || amt <= 0) { this.showToast('Enter a valid player and amount.'); return; }
+    this.updateGame(g => {
+      const players = g.players.map(p => p.username === username ? { ...p, balance: p.balance + amt } : p);
+      return this.logActivity({ ...g, players }, `Admin minted ${this.formatMoney(amt)} to ${username}`);
+    });
+    this.setState({ mintForm: { username: '', amount: '' } });
+    this.showToast('Tokens deposited.');
+  };
+
+  updateAdminTransferUsername = (e) => this.setState({ adminTransferForm: { username: e.target.value } });
+  submitAdminTransfer = (e) => {
+    e.preventDefault();
+    const username = this.state.adminTransferForm.username;
+    if (!username) { this.showToast('Choose a player.'); return; }
+    this.updateGame(g => this.logActivity({ ...g, admin: username }, `${username} is now the game admin`));
+    this.setState({ adminTransferForm: { username: '' } });
+    this.showToast('Admin role transferred.');
+  };
+
+  openAdminModal = () => this.setState({ adminModalOpen: true });
+  closeAdminModal = () => this.setState({ adminModalOpen: false });
+  openPayoutModal = () => this.setState({ payoutModalOpen: true });
+  closePayoutModal = () => this.setState({ payoutModalOpen: false });
+  openQuitConfirm = () => this.setState({ quitConfirmOpen: true });
+  closeQuitConfirm = () => this.setState({ quitConfirmOpen: false });
+  confirmQuit = () => {
+    const game = this.state.games.find(g => g.id === this.state.selectedGameId);
+    if (game.admin === this.state.currentUsername) { this.showToast('Transfer admin role before quitting.'); this.setState({ quitConfirmOpen: false }); return; }
+    this.updateGame(g => this.logActivity({ ...g, players: g.players.filter(p => p.username !== this.state.currentUsername) }, `${this.state.currentUsername} quit the game`));
+    this.setState({ quitConfirmOpen: false, screen: 'home' });
+    this.showToast('You left the game. Your balance was burned.');
+  };
+
+  openCloseConfirm = () => this.setState({ closeConfirmOpen: true });
+  closeCloseConfirm = () => this.setState({ closeConfirmOpen: false });
+  confirmClose = () => {
+    this.updateGame(g => ({
+      ...g, closed: true, players: g.players.map(p => ({ ...p, balance: 0 })),
+      ...(g.pot ? { pot: { total: 0, contributions: {}, showhand: {} } } : {}),
+      ...(g.pool ? { pool: { total: 0 } } : {})
+    }));
+    this.setState({ closeConfirmOpen: false, screen: 'home' });
+    this.showToast('Game closed. All balances burned.');
+  };
+
+  openDeleteConfirm = () => this.setState({ deleteConfirmOpen: true });
+  closeDeleteConfirm = () => this.setState({ deleteConfirmOpen: false });
+  confirmDelete = () => {
+    const inGame = this.state.games.some(g => !g.closed && g.players.some(p => p.username === this.state.currentUsername));
+    if (inGame) { this.showToast('Quit or close all games before deleting your account.'); this.setState({ deleteConfirmOpen: false }); return; }
+    this.setState(s => {
+      const users = { ...s.users }; delete users[s.currentUsername];
+      return { users, currentUsername: null, screen: 'login', deleteConfirmOpen: false };
+    });
+    this.showToast('Account deleted.');
+  };
+
+  decorateGame(g, me) {
+    const modeLabel = g.mode === 'general' ? 'General Mode' : g.mode === 'poker' ? 'Poker Mode' : 'Pool Mode';
+    const modeTint = g.mode === 'general' ? 'rgba(103,232,249,.14)' : g.mode === 'poker' ? 'rgba(167,139,250,.18)' : 'rgba(255,255,255,.08)';
+    const modeText = g.mode === 'general' ? '#67e8f9' : g.mode === 'poker' ? '#c4b5fd' : '#f4f1fb';
+    const modeAbbr = g.mode === 'general' ? 'GEN' : g.mode === 'poker' ? 'POK' : 'POOL';
+    const myBalance = (g.players.find(p => p.username === me) || {}).balance || 0;
+    return { ...g, modeLabel, modeTint, modeText, modeAbbr, myBalance, myBalanceFmt: this.formatMoney(myBalance), playerCount: g.players.length };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const me = s.currentUsername;
+
+    const yourGamesRaw = s.games.filter(g => !g.closed && g.players.some(p => p.username === me));
+    const yourGames = yourGamesRaw.map(g => ({ ...this.decorateGame(g, me), onOpen: () => this.openGame(g.id) }));
+    const totalBalance = yourGamesRaw.reduce((sum, g) => sum + ((g.players.find(p => p.username === me) || {}).balance || 0), 0);
+
+    const filter = (s.browseFilter || '').toLowerCase();
+    const browseGamesRaw = s.games.filter(g => !g.closed && g.name.toLowerCase().includes(filter));
+    const browseGames = browseGamesRaw.map(g => {
+      const d = this.decorateGame(g, me);
+      const joined = g.players.some(p => p.username === me);
+      const actionLabel = joined ? 'Open' : (g.visibility === 'private' ? 'Enter password' : 'Join');
+      return {
+        ...d,
+        visibilityLabel: g.visibility === 'private' ? 'Private' : 'Public',
+        actionLabel,
+        actionBg: joined ? 'rgba(255,255,255,.12)' : 'linear-gradient(90deg,#8b5cf6,#22d3ee)',
+        actionColor: joined ? '#f4f1fb' : '#0b0620',
+        onAction: () => this.requestJoin(g)
+      };
+    });
+
+    const selectedGameRaw = s.games.find(g => g.id === s.selectedGameId);
+    let selGame = null, myBalanceFmt = '0.00', contributors = [], otherPlayersForAdmin = [];
+    let gameIsGeneral = false, gameIsPoker = false, gameIsPool = false, isGameAdmin = false, transferRows = [];
+    let noContributors = true, hasContributors = false, hasWinnerShare = false, declareShareFmt = '';
+
+    if (selectedGameRaw) {
+      const d = this.decorateGame(selectedGameRaw, me);
+      const players = selectedGameRaw.players.map(p => ({
+        ...p, label: p.username + (p.username === me ? ' (you)' : '') + (p.username === selectedGameRaw.admin ? ' · admin' : ''),
+        balanceFmt: this.formatMoney(p.balance)
+      }));
+      selGame = {
+        ...d, players,
+        potTotalFmt: selectedGameRaw.pot ? this.formatMoney(selectedGameRaw.pot.total) : '0.00',
+        poolTotalFmt: selectedGameRaw.pool ? this.formatMoney(selectedGameRaw.pool.total) : '0.00'
+      };
+      const me_ = selectedGameRaw.players.find(p => p.username === me);
+      myBalanceFmt = this.formatMoney(me_ ? me_.balance : 0);
+      isGameAdmin = selectedGameRaw.admin === me;
+      gameIsGeneral = selectedGameRaw.mode === 'general';
+      gameIsPoker = selectedGameRaw.mode === 'poker';
+      gameIsPool = selectedGameRaw.mode === 'pool';
+      otherPlayersForAdmin = selectedGameRaw.players.filter(p => p.username !== selectedGameRaw.admin);
+
+      if (gameIsPoker) {
+        const contrib = selectedGameRaw.pot.contributions || {};
+        contributors = Object.keys(contrib).filter(u => contrib[u] > 0).map(u => {
+          const selected = s.winnersSelected.includes(u);
+          return {
+            username: u, amountFmt: this.formatMoney(contrib[u]), isShowhand: !!selectedGameRaw.pot.showhand[u],
+            selBg: selected ? '#a78bfa' : 'rgba(255,255,255,.06)', selBorder: selected ? '#a78bfa' : 'rgba(255,255,255,.14)',
+            selColor: selected ? '#0b0620' : 'rgba(244,241,251,.5)', selLabel: selected ? 'Winner' : 'Select',
+            onToggle: () => this.toggleWinner(u)
+          };
+        });
+        noContributors = contributors.length === 0;
+        hasContributors = !noContributors;
+        hasWinnerShare = s.winnersSelected.length > 0 && selectedGameRaw.pot.total > 0;
+        if (hasWinnerShare) declareShareFmt = this.formatMoney(selectedGameRaw.pot.total / s.winnersSelected.length);
+      }
+
+      if (gameIsGeneral) {
+        const otherPlayers = selectedGameRaw.players.filter(p => p.username !== me);
+        transferRows = s.transferForm.recipients.map((r, idx) => ({
+          ...r, otherPlayers, canRemove: s.transferForm.recipients.length > 1,
+          onUsernameChange: (e) => this.updateRecipientRow(idx, 'username', e.target.value),
+          onAmountChange: (e) => this.updateRecipientRow(idx, 'amount', e.target.value),
+          onRemove: () => this.removeRecipientRow(idx)
+        }));
+      }
+    }
+
+    const transferTotal = s.transferForm.recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+    return {
+      isLogin: s.screen === 'login', isRegister: s.screen === 'register', isHome: s.screen === 'home',
+      isBrowse: s.screen === 'browse', isCreate: s.screen === 'create', isGame: s.screen === 'game', isAccount: s.screen === 'account',
+      showNav: ['home', 'browse', 'account'].includes(s.screen),
+      navHomeColor: s.screen === 'home' ? '#67e8f9' : 'rgba(244,241,251,.45)',
+      navBrowseColor: s.screen === 'browse' ? '#67e8f9' : 'rgba(244,241,251,.45)',
+      navAccountColor: s.screen === 'account' ? '#67e8f9' : 'rgba(244,241,251,.45)',
+
+      loginUsername: s.loginForm.username, loginPassword: s.loginForm.password,
+      updateLoginUsername: this.updateLoginUsername, updateLoginPassword: this.updateLoginPassword, submitLogin: this.submitLogin,
+      registerUsername: s.registerForm.username, registerPassword: s.registerForm.password, registerConfirm: s.registerForm.confirm,
+      updateRegisterUsername: this.updateRegisterUsername, updateRegisterPassword: this.updateRegisterPassword,
+      updateRegisterConfirm: this.updateRegisterConfirm, submitRegister: this.submitRegister,
+      authError: s.authError, hasAuthError: !!s.authError,
+      goLogin: this.goLogin, goRegister: this.goRegister, goHome: this.goHome, goBrowse: this.goBrowse,
+      goAccount: this.goAccount, goCreate: this.goCreate, logout: this.logout,
+
+      initials: (me || '').slice(0, 2).toUpperCase(),
+      currentUsername: me,
+      totalBalanceFmt: this.formatMoney(totalBalance),
+      yourGamesCountLabel: yourGamesRaw.length + (yourGamesRaw.length === 1 ? ' active game' : ' active games'),
+      yourGames, noYourGames: yourGames.length === 0,
+
+      browseFilter: s.browseFilter, updateBrowseFilter: this.updateBrowseFilter,
+      browseGames, noBrowseGames: browseGames.length === 0,
+
+      createName: s.createForm.name, updateCreateName: this.updateCreateName,
+      createIsPrivate: s.createForm.visibility === 'private',
+      createPassword: s.createForm.password, updateCreatePassword: this.updateCreatePassword,
+      createError: s.createError, hasCreateError: !!s.createError, submitCreate: this.submitCreate,
+      setCreateModeGeneral: this.setCreateModeGeneral, setCreateModePoker: this.setCreateModePoker, setCreateModePool: this.setCreateModePool,
+      setCreateVisibilityPublic: this.setCreateVisibilityPublic, setCreateVisibilityPrivate: this.setCreateVisibilityPrivate,
+      modeGeneralBg: s.createForm.mode === 'general' ? 'rgba(34,211,238,.14)' : 'rgba(255,255,255,.05)',
+      modeGeneralBorder: s.createForm.mode === 'general' ? '#22d3ee' : 'rgba(255,255,255,.14)',
+      modePokerBg: s.createForm.mode === 'poker' ? 'rgba(167,139,250,.18)' : 'rgba(255,255,255,.05)',
+      modePokerBorder: s.createForm.mode === 'poker' ? '#a78bfa' : 'rgba(255,255,255,.14)',
+      modePoolBg: s.createForm.mode === 'pool' ? 'rgba(255,255,255,.1)' : 'rgba(255,255,255,.05)',
+      modePoolBorder: s.createForm.mode === 'pool' ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.14)',
+      visPublicBg: s.createForm.visibility === 'public' ? 'linear-gradient(90deg,#8b5cf6,#22d3ee)' : 'rgba(255,255,255,.05)',
+      visPublicBorder: s.createForm.visibility === 'public' ? '#8b5cf6' : 'rgba(255,255,255,.14)',
+      visPrivateBg: s.createForm.visibility === 'private' ? 'linear-gradient(90deg,#8b5cf6,#22d3ee)' : 'rgba(255,255,255,.05)',
+      visPrivateBorder: s.createForm.visibility === 'private' ? '#8b5cf6' : 'rgba(255,255,255,.14)',
+
+      selGame, myBalanceFmt, isGameAdmin, gameIsGeneral, gameIsPoker, gameIsPool,
+      transferRows, addRecipientRow: this.addRecipientRow, submitTransfer: this.submitTransfer,
+      transferError: s.transferError, hasTransferError: !!s.transferError,
+      transferTotalFmt: this.formatMoney(transferTotal),
+
+      potAmount: s.potForm.amount, updatePotAmount: this.updatePotAmount, contributeToPot: this.contributeToPot, showhand: this.showhand,
+      contributors, noContributors, hasContributors, hasWinnerShare, declareShareFmt, declareWinners: this.declareWinners,
+
+      poolAmount: s.poolForm.amount, updatePoolAmount: this.updatePoolAmount, contributeToPool: this.contributeToPool,
+      payoutUsername: s.payoutForm.username, payoutAmount: s.payoutForm.amount,
+      updatePayoutUsername: this.updatePayoutUsername, updatePayoutAmount: this.updatePayoutAmount, submitPayout: this.submitPayout,
+
+      mintUsername: s.mintForm.username, mintAmount: s.mintForm.amount,
+      updateMintUsername: this.updateMintUsername, updateMintAmount: this.updateMintAmount, submitMint: this.submitMint,
+      adminTransferUsername: s.adminTransferForm.username, otherPlayersForAdmin,
+      updateAdminTransferUsername: this.updateAdminTransferUsername, submitAdminTransfer: this.submitAdminTransfer,
+      openCloseConfirm: this.openCloseConfirm,
+      adminModalOpen: s.adminModalOpen, openAdminModal: this.openAdminModal, closeAdminModal: this.closeAdminModal,
+      payoutModalOpen: s.payoutModalOpen, openPayoutModal: this.openPayoutModal, closePayoutModal: this.closePayoutModal,
+
+      hasActivity: !!(selGame && selGame.activity && selGame.activity.length > 0),
+
+      openQuitConfirm: this.openQuitConfirm, closeQuitConfirm: this.closeQuitConfirm, confirmQuit: this.confirmQuit, quitConfirmOpen: s.quitConfirmOpen,
+      closeConfirmOpen: s.closeConfirmOpen, closeCloseConfirm: this.closeCloseConfirm, confirmClose: this.confirmClose,
+      deleteConfirmOpen: s.deleteConfirmOpen, openDeleteConfirm: this.openDeleteConfirm, closeDeleteConfirm: this.closeDeleteConfirm, confirmDelete: this.confirmDelete,
+
+      joinModalOpen: !!s.joinModal,
+      joinGameName: s.joinModal ? (s.games.find(g => g.id === s.joinModal.gameId) || {}).name : '',
+      joinPassword: s.joinModal ? s.joinModal.password : '',
+      joinError: s.joinModal ? s.joinModal.error : '', hasJoinError: !!(s.joinModal && s.joinModal.error),
+      updateJoinPassword: this.updateJoinPassword, closeJoinModal: this.closeJoinModal, submitJoinPassword: this.submitJoinPassword,
+
+      toast: s.toast, hasToast: !!s.toast, toastBottom: s.screen === 'game' ? '100px' : (['home', 'browse', 'account'].includes(s.screen) ? '78px' : '20px')
+    };
+  }
+}
+
+</script>
+</body>
+</html>
