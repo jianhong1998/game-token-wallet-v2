@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { initializeRegistry } from "@/server/actions/registry";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 export default function AdminRegistryPage() {
   const [status, setStatus] = useState<string | null>(null);
@@ -21,25 +23,20 @@ export default function AdminRegistryPage() {
   }
 
   return (
-    <main className="py-8 flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Registry admin</h1>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isPending}
-        className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
-      >
-        {isPending ? "Initializing…" : "Initialize registry"}
-      </button>
+    <main className="flex flex-col gap-5 py-8">
+      <h1 className="text-xl font-extrabold text-text-primary">Registry admin</h1>
+      <Button type="button" variant="primary" onClick={handleClick} isLoading={isPending}>
+        Initialize registry
+      </Button>
       {status && (
-        <p data-testid="registry-status" className="break-all text-sm text-green-700">
+        <Alert data-testid="registry-status" variant="success" className="break-all">
           {status}
-        </p>
+        </Alert>
       )}
       {error && (
-        <p data-testid="registry-error" className="break-all text-sm text-red-700">
+        <Alert data-testid="registry-error" variant="error" className="break-all">
           {error}
-        </p>
+        </Alert>
       )}
     </main>
   );
