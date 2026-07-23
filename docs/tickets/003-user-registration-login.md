@@ -2,7 +2,7 @@
 
 **What to build:** A new user can register with a username and password, and log back in — the custodial account model from [002-architecture-decisions.md](../technical-related/architecture/002-architecture-decisions.md) Q1 (password is a stored hash for login gating only, not a signing secret).
 
-**Blocked by:** 001
+**Blocked by:** 001, 017
 
 **Status:** ready-for-agent
 

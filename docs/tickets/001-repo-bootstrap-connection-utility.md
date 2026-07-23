@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] New repo initialized: Next.js (app router) + TypeScript + TanStack React Query + React Context scaffolding, plus an Anchor program skeleton building successfully via `anchor build`. (Note: TanStack React Query and React Context are not yet wired as dependencies/providers — there's no server state to query nor cross-component state to share yet. Empty `apps/frontend/src/hooks/`, `apps/frontend/src/context/`, `apps/frontend/src/components/` placeholder directories were added to make the intended structure visible; installing an unused provider now would be speculative scaffolding. Wiring a real `QueryClientProvider`/Context provider is deferred to whichever ticket first needs one.)
 - [x] A connection/signer utility reads the cluster type/provider and the system admin wallet keypair from environment variables, and exposes a lazy singleton Program/Connection accessor — all server-side code goes through it, nothing else constructs a `Connection`/`Program` directly.
