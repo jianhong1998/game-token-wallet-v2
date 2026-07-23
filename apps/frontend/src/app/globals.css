@@ -88,10 +88,9 @@
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* --radius-sm/md/lg/xl intentionally omitted here: this app defines its own values
+     for those names in the @theme block above; keeping shadcn's calc()-derived
+     versions here would silently shadow them via CSS cascade. */
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
