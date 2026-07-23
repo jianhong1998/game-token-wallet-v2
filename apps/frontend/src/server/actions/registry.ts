@@ -24,7 +24,7 @@ export async function initializeRegistry(): Promise<{ activeGameCount: number }>
   }
 
   const initializeInstruction = await getInitializeRegistryInstructionAsync(
-    { admin: adminSigner },
+    { admin: adminSigner, registry: registryAddress },
     { programAddress },
   );
 

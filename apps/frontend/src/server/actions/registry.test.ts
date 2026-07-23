@@ -97,8 +97,12 @@ describe("initializeRegistry", () => {
 
     expect(result).toEqual({ activeGameCount: 0 });
     expect(mockSendAndConfirmTransaction).toHaveBeenCalledTimes(1);
+    // Regression guard: the registry account must be passed explicitly using
+    // the PDA derived against the env-configured program address, never left
+    // for the generated builder to re-derive against its codegen-baked
+    // default program address — see apps/on-chain-client/src/generated/instructions/initializeRegistry.ts.
     expect(mockGetInitializeRegistryInstructionAsync).toHaveBeenCalledWith(
-      { admin: { address: "Admin111111111111111111111111111111111111" } },
+      { admin: { address: "Admin111111111111111111111111111111111111" }, registry: REGISTRY_ADDRESS },
       { programAddress: "Prog1111111111111111111111111111111111111" },
     );
   });
