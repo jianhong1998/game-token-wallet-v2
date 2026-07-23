@@ -1,0 +1,120 @@
+version: 2.1
+
+# Shared toolchain install command, used by `cargo-test` only.
+# Each PATH addition is appended to $BASH_ENV rather than exported inline,
+# because CircleCI runs every `run` step in a fresh non-login shell that
+# only inherits env set via $BASH_ENV from prior steps.
+#
+# `cargo-test` only runs `cargo test` on a pure-Rust crate with no
+# Solana/Anchor CLI dependency (confirmed: passes with solana/anchor/avm
+# absent from PATH) — it needs a Rust toolchain (cimg/base:current does not
+# ship one; confirmed via `docker run cimg/base:current` — no cargo/rustc
+# present) but nothing Solana-specific. `on-chain-program-e2e` no longer
+# needs this: it runs entirely inside `docker-compose.e2e.yml`'s
+# `on-chain-program-e2e` service (against the same `surfpool` +
+# `program-deploy` stack the `e2e` job uses), whose Anchor/Solana toolchain
+# lives in `docker/local/Dockerfile.anchor` — not duplicated here.
+commands:
+  install_rust:
+    steps:
+      - run:
+          name: Install Rust
+          command: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      - run:
+          name: Add cargo to PATH
+          command: echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
+
+jobs:
+  lint:
+    docker:
+      - image: cimg/node:24.18
+    steps:
+      - checkout
+      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    docker:
+      - image: cimg/node:24.18
+    steps:
+      - checkout
+      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  web-unit-tests:
+    docker:
+      - image: cimg/node:24.18
+    steps:
+      - checkout
+      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend run test
+      - run: pnpm --filter on-chain-client run test
+
+  # cimg/base:current: confirmed (CircleCI-Public/cimg-base migrated to an
+  # Ubuntu 24.04 base in mid-2025, per CircleCI's own discuss.circleci.com
+  # thread "Convenience image cimg/node uses 2 year old Ubuntu 22 base").
+  # `:current` is a moving tag, so this isn't a hard pin — see report for
+  # residual risk. That said, this job (see below) installs nothing but a
+  # bare Rust toolchain via rustup, which has no specific glibc floor to
+  # defend here.
+  #
+  # This job only runs `cargo test` on the on-chain-program crate, which has
+  # exactly one trivial macro-generated test (`test_id`, from Anchor's
+  # `declare_id!`) and no dependency on the Solana/Anchor CLI toolchain —
+  # confirmed by running `cargo test` with solana/anchor/avm stripped from
+  # PATH. It only needs a bare Rust toolchain (`install_rust`).
+  cargo-test:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - install_rust
+      - run:
+          name: cargo test
+          working_directory: apps/on-chain-program
+          command: cargo test
+
+  # Runs the on-chain-program-e2e vitest suite against `surfpool` +
+  # `program-deploy` from docker-compose.e2e.yml — the same stack the `e2e`
+  # job below boots, just targeting a different leaf container. Replaces the
+  # former bare-metal `anchor test` invocation (which needed the full
+  # Anchor/Solana toolchain plus a `surfpool` binary installed directly on
+  # this machine) with the toolchain that already lives in
+  # `docker/local/Dockerfile.anchor`, avoiding a second, duplicated install
+  # path. Positional service args scope Compose to just this chain, same
+  # pattern as the `e2e` job.
+  on-chain-program-e2e:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run:
+          name: on-chain-program-e2e
+          command: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from on-chain-program-e2e surfpool program-deploy on-chain-program-e2e
+
+  # Task 10's fix for Compose aborting the whole stack on the first
+  # container exit was made at the docker-compose.e2e.yml level
+  # (program-deploy now blocks on `tail -f /dev/null` after a healthcheck
+  # marker file, instead of exiting 0), not in this job's command.
+  # Positional service args scope Compose to just this job's chain
+  # (surfpool -> program-deploy -> frontend -> e2e), skipping the unrelated
+  # on-chain-program-e2e image/container.
+  e2e:
+    machine:
+      image: ubuntu-2404:current
+    steps:
+      - checkout
+      - run: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e surfpool program-deploy frontend e2e
+
+workflows:
+  ci:
+    jobs:
+      - lint
+      - typecheck
+      - web-unit-tests
+      - cargo-test
+      - on-chain-program-e2e
+      - e2e

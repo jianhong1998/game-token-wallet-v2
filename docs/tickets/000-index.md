@@ -11,24 +11,24 @@ CI stage gating, deposit conversion rate, etc.) are tracked in
 [002-pending-discussion.md](../business-related/002-pending-discussion.md) — check it before implementing a ticket that
 touches one of those areas.
 
-| #   | Title                                     | Blocked by |
-| --- | ----------------------------------------- | ---------- |
-| 001 | Repo bootstrap & connection utility       | None       |
-| 002 | Registry account + init                   | 001        |
-| 003 | User registration & login                 | 001        |
-| 004 | Devnet deploy pipeline + Docker self-host | 001, 003   |
-| 005 | Create game (General Mode, public)        | 002, 003   |
-| 006 | Join game (public)                        | 005        |
-| 007 | Private games (password-protected)        | 005, 006   |
-| 008 | Deposit / mint to player                  | 006        |
-| 009 | General Mode transfers                    | 008        |
-| 010 | Game admin transfer                       | 006        |
-| 011 | Quit game                                 | 009        |
-| 012 | Delete user account                       | 003, 011   |
-| 013 | Close game (General Mode)                 | 002, 009   |
-| 014 | Poker Mode: single pot                    | 006, 008   |
-| 015 | Poker Mode: side pots                     | 014, 013   |
-| 016 | General Pool Mode                         | 008, 013   |
+| #   | Title                                     | Blocked by | Status  |
+| --- | ----------------------------------------- | ---------- | ------- |
+| 001 | Repo bootstrap & connection utility       | None       | Pending |
+| 002 | Registry account + init                   | 001        | Pending |
+| 003 | User registration & login                 | 001        | Pending |
+| 004 | Devnet deploy pipeline + Docker self-host | 001, 003   | Pending |
+| 005 | Create game (General Mode, public)        | 002, 003   | Pending |
+| 006 | Join game (public)                        | 005        | Pending |
+| 007 | Private games (password-protected)        | 005, 006   | Pending |
+| 008 | Deposit / mint to player                  | 006        | Pending |
+| 009 | General Mode transfers                    | 008        | Pending |
+| 010 | Game admin transfer                       | 006        | Pending |
+| 011 | Quit game                                 | 009        | Pending |
+| 012 | Delete user account                       | 003, 011   | Pending |
+| 013 | Close game (General Mode)                 | 002, 009   | Pending |
+| 014 | Poker Mode: single pot                    | 006, 008   | Pending |
+| 015 | Poker Mode: side pots                     | 014, 013   | Pending |
+| 016 | General Pool Mode                         | 008, 013   | Pending |
 
 ## Dependency diagram
 

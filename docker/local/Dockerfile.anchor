@@ -1,0 +1,64 @@
+# Built for linux/amd64 (forced via docker-compose.yml's `platform:` key) —
+# Solana/Anchor publish no linux/arm64 prebuilt binaries for the Solana CLI
+# or anchor-cli, which would otherwise force multi-minute from-source
+# compiles of the entire toolchain on Apple Silicon hosts. Building for
+# amd64 (transparently emulated by Docker Desktop) lets every install below
+# use the same prebuilt binaries CI (x86_64 Linux) uses.
+#
+# Uses the `-trixie` (Debian 13, glibc 2.41) variant rather than
+# `-bookworm` (Debian 12, glibc 2.36): the prebuilt anchor-cli 1.1.2
+# x86_64-linux binary requires GLIBC_2.39+, which bookworm doesn't ship
+# (`anchor-1.1.2: ... version 'GLIBC_2.39' not found` at runtime).
+FROM node:24.18.0-trixie
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl ca-certificates build-essential pkg-config libssl-dev git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Rust toolchain — needed to build `avm` itself (no prebuilt avm binaries
+# are published for any platform).
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Solana CLI (official installer; downloads a prebuilt x86_64-linux binary).
+RUN sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+ENV PATH="/root/.local/share/solana/install/active_release/bin:${PATH}"
+
+# Anchor CLI via AVM (downloads a prebuilt x86_64-linux anchor-cli binary).
+RUN cargo install --git https://github.com/solana-foundation/anchor --tag v1.1.2 avm --locked
+ENV PATH="/root/.avm/bin:${PATH}"
+RUN avm install 1.1.2 && avm use 1.1.2
+
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
+
+# Fixed local-dev deploy/upgrade-authority identity — a throwaway, non-secret
+# keypair committed at docker/local/fixtures/deployer-keypair.dev.json (see
+# the README alongside it), distinct from the program's own identity keypair.
+# Copied in rather than `solana-keygen new`-generated: a freshly generated
+# key differs on every image build, so a later `anchor deploy` from a
+# rebuilt image (or from the host via `just deploy-program-local`) would
+# fail with "Upgrade authority mismatch" against whatever authority an
+# earlier build/run already set on the deployed program.
+COPY docker/local/fixtures/deployer-keypair.dev.json /root/.config/solana/id.json
+
+WORKDIR /workspace
+
+ENTRYPOINT ["sh", "-c"]
+# Airdrops to two distinct wallets: this container's fixed deployer keypair
+# (seeded above, pays for `anchor build`/`anchor deploy`) and, separately,
+# the frontend's SYSTEM_ADMIN_SECRET_KEY dev wallet (address
+# 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV, a fixed key set directly in
+# docker-compose.yml) — that wallet pays for every `noop` transaction the
+# frontend submits, and without funding it here every transaction fails
+# with "Attempt to debit an account but found no record of a prior credit."
+# Seeds target/deploy/game_token_wallet-keypair.json from the committed
+# throwaway fixture (docker/local/fixtures/game_token_wallet-keypair.dev.json,
+# see the README alongside it) BEFORE `anchor build` runs. That gitignored
+# keypair file is what determines the program's actual deployed address;
+# without seeding it here, `anchor build` mints a brand-new random keypair
+# whenever it's missing (fresh clone, another `anchor build` elsewhere on
+# the host, etc.), silently drifting the deployed address out of sync with
+# the `declare_id!`/`Anchor.toml`/`PROGRAM_ID` values committed to source.
+# Seeding from a fixed, committed fixture guarantees the same deployed
+# address on every container run, on every machine.
+CMD ["mkdir -p apps/on-chain-program/target/deploy && cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json && solana airdrop 10 --url \"$ANCHOR_PROVIDER_URL\" && solana airdrop 10 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV --url \"$ANCHOR_PROVIDER_URL\" && cd apps/on-chain-program && anchor build && anchor deploy --provider.cluster \"$ANCHOR_PROVIDER_URL\" && cd ../.. && pnpm install --frozen-lockfile && pnpm --filter on-chain-client run codegen"]

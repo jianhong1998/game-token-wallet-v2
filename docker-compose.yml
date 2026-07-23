@@ -1,0 +1,94 @@
+services:
+  surfpool:
+    # Pinned by digest (not :latest) so upstream image updates can't silently break local dev / CI — bump deliberately when needed.
+    image: surfpool/surfpool@sha256:4f7b64daa96ab42d8a0d46cd0de556b1c90386f56fd66cfdefcb5f7039fdec9f
+    command: ["start", "--no-tui"]
+    ports:
+      - "8899:8899"
+      - "8900:8900"
+      - "18488:18488"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'curl -sf -X POST -H ''Content-Type: application/json'' -d ''{"jsonrpc":"2.0","id":1,"method":"getHealth"}'' http://localhost:8899 || exit 1',
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  program-deploy:
+    build:
+      context: .
+      dockerfile: docker/local/Dockerfile.anchor
+    # Forced to amd64: Solana/Anchor publish no linux/arm64 prebuilt
+    # binaries, so a native arm64 build (Apple Silicon hosts) would fall
+    # back to slow from-source compiles of the whole toolchain. See
+    # docker/local/Dockerfile.anchor for detail.
+    platform: linux/amd64
+    depends_on:
+      surfpool:
+        condition: service_healthy
+    environment:
+      ANCHOR_PROVIDER_URL: http://surfpool:8899
+    volumes:
+      - .:/workspace
+      # node_modules is deliberately NOT part of the bind mount above: the
+      # host (macOS/arm64) and this container (linux/amd64) both running
+      # `pnpm install` against the same on-disk node_modules corrupts
+      # whichever side installed second (wrong-platform native binaries —
+      # e.g. lightningcss, esbuild, sharp — and, worse, a `pnpm install`
+      # on either side while the frontend dev server is live crashes it
+      # mid-flight). Named volumes below give each workspace package's
+      # node_modules an isolated, container-only home so container and
+      # host installs never touch the same files. `apps/on-chain-client/
+      # src/generated` is intentionally still bind-mounted (via `.` above)
+      # since Codama's codegen output must land on the host to be
+      # committed to git.
+      - node_modules:/workspace/node_modules
+      - frontend_node_modules:/workspace/apps/frontend/node_modules
+      - on_chain_program_e2e_node_modules:/workspace/apps/on-chain-program-e2e/node_modules
+      - e2e_node_modules:/workspace/apps/e2e/node_modules
+      - on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/local/Dockerfile.frontend
+    # Must match program-deploy's platform: both share the same named
+    # node_modules volumes (see below), and pnpm installs platform-specific
+    # optional native binaries (e.g. lightningcss for Tailwind v4). A
+    # platform mismatch between the two services leaves whichever one
+    # ran `pnpm install` last with the wrong binary for its own
+    # architecture (observed: "Cannot find module
+    # '../lightningcss.linux-arm64-gnu.node'" when frontend ran natively
+    # on arm64 after program-deploy's amd64 install populated the shared
+    # node_modules).
+    platform: linux/amd64
+    depends_on:
+      program-deploy:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./apps/frontend/.env
+    volumes:
+      - .:/workspace
+      # Same named volumes as program-deploy — see the comment there.
+      # Sharing them (rather than giving frontend its own set) lets
+      # frontend reuse program-deploy's already-installed node_modules
+      # ("Already up to date", no reinstall) since both run on the same
+      # platform and never run pnpm concurrently (program-deploy exits
+      # before frontend starts).
+      - node_modules:/workspace/node_modules
+      - frontend_node_modules:/workspace/apps/frontend/node_modules
+      - on_chain_program_e2e_node_modules:/workspace/apps/on-chain-program-e2e/node_modules
+      - e2e_node_modules:/workspace/apps/e2e/node_modules
+      - on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
+
+volumes:
+  node_modules:
+  frontend_node_modules:
+  on_chain_program_e2e_node_modules:
+  e2e_node_modules:
+  on_chain_client_node_modules:

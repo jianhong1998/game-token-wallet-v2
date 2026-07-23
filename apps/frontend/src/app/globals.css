@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --breakpoint-sm: 30rem;
+  --width-app-max: 28rem;
+}
+
+.app-shell {
+  max-width: var(--width-app-max);
+  margin-inline: auto;
+}

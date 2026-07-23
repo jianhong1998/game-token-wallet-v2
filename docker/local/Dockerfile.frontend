@@ -1,0 +1,7 @@
+FROM node:24.18.0-bookworm
+
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
+
+WORKDIR /workspace
+
+CMD ["sh", "-c", "pnpm install --frozen-lockfile && pnpm --filter frontend run dev"]

@@ -3,6 +3,7 @@
 
 # NodeJS
 node_modules
+.pnpm-store/
 
 
 # Temporary folders
@@ -12,3 +13,15 @@ temp
 .env
 .env*.local
 !.env.template
+
+# Build outputs
+.next/
+dist/
+target/
+!apps/on-chain-program/target/idl/
+
+# Logs
+*.log
+
+# Playwright MCP scratch output (console/page snapshots from browser-tool verification runs)
+.playwright-mcp/

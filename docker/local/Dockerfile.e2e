@@ -1,0 +1,18 @@
+# Base image tag pinned to match apps/e2e/package.json's actual
+# `@playwright/test` version (^1.61.1) — the plan called for v1.49.0-jammy,
+# but Task 8 noted the real installed version resolved to ^1.61.1, not the
+# plan's 1.49.0. Playwright requires the runner image's bundled browser
+# binaries to match the npm package's major.minor closely, so the base
+# image tag is bumped to v1.61.1-noble (Ubuntu 24.04) to match.
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
+
+RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
+
+WORKDIR /workspace
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY apps/e2e/package.json ./apps/e2e/package.json
+RUN pnpm install --frozen-lockfile --filter e2e...
+COPY apps/e2e ./apps/e2e
+
+WORKDIR /workspace/apps/e2e
+CMD ["pnpm", "test"]

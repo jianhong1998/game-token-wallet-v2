@@ -38,7 +38,7 @@ game-token-wallet-v2/
 │   │   ├── .env.template
 │   │   └── package.json
 │   │
-│   ├── on-chain-program-e2e/          # Anchor integration tests (anchor test), consumes packages/on-chain-client
+│   ├── on-chain-program-e2e/          # Anchor integration tests (anchor test), consumes apps/on-chain-client
 │   │   ├── tests/
 │   │   │   ├── user/
 │   │   │   ├── game/
@@ -47,17 +47,16 @@ game-token-wallet-v2/
 │   │   │   └── pool_mode/
 │   │   └── package.json
 │   │
-│   └── e2e/                           # Playwright browser tests, drives apps/frontend
-│       ├── tests/
-│       │   ├── auth/
-│       │   ├── game-creation/
-│       │   ├── general-mode/
-│       │   ├── poker-mode/
-│       │   └── pool-mode/
-│       ├── playwright.config.ts
-│       └── package.json
-│
-├── packages/
+│   ├── e2e/                           # Playwright browser tests, drives apps/frontend
+│   │   ├── tests/
+│   │   │   ├── auth/
+│   │   │   ├── game-creation/
+│   │   │   ├── general-mode/
+│   │   │   ├── poker-mode/
+│   │   │   └── pool-mode/
+│   │   ├── playwright.config.ts
+│   │   └── package.json
+│   │
 │   └── on-chain-client/               # Anchor IDL + Codama-generated TS client; produced by on-chain-program, consumed by frontend and on-chain-program-e2e
 │
 ├── docker/
@@ -69,9 +68,9 @@ game-token-wallet-v2/
 │   └── config.yml                     # lint, typecheck, cargo test, on-chain-program-e2e, e2e, web unit tests — all on every PR
 ├── docker-compose.yml                 # local dev stack only (frontend dev image + Surfpool)
 ├── docker-compose.e2e.yml             # CI test stack — prod-built frontend image (via docker/deployment) + Surfpool + program deploy
-├── pnpm-workspace.yaml                # apps/*, packages/*
+├── pnpm-workspace.yaml                # apps/*
 ├── package.json                       # workspace root: lint/typecheck/test fan-out scripts
-├── tsconfig.base.json                 # shared by apps/frontend + packages/on-chain-client
+├── tsconfig.base.json                 # shared by apps/frontend + apps/on-chain-client
 ├── .eslintrc / prettier config        # shared
 └── Justfile
 ```
