@@ -512,6 +512,12 @@ describe("initializeRegistry", () => {
 
     expect(result).toEqual({ activeGameCount: 1 });
     expect(mockSendAndConfirmTransaction).not.toHaveBeenCalled();
+    // Regression guard: the registry PDA must be derived against the
+    // env-configured program address (getSolanaContext), never the
+    // codegen-baked default — see apps/frontend/src/server/actions/noop.ts.
+    expect(mockFindRegistryPda).toHaveBeenCalledWith({
+      programAddress: "Prog1111111111111111111111111111111111111",
+    });
   });
 
   it("sends the init transaction and returns zero active games when the registry does not yet exist", async () => {
@@ -521,6 +527,10 @@ describe("initializeRegistry", () => {
 
     expect(result).toEqual({ activeGameCount: 0 });
     expect(mockSendAndConfirmTransaction).toHaveBeenCalledTimes(1);
+    expect(mockGetInitializeRegistryInstructionAsync).toHaveBeenCalledWith(
+      { admin: { address: "Admin111111111111111111111111111111111111" } },
+      { programAddress: "Prog1111111111111111111111111111111111111" },
+    );
   });
 
   it("recovers by re-fetching when the init transaction races and the account already exists", async () => {
@@ -567,18 +577,19 @@ import { fetchMaybeRegistry, findRegistryPda, getInitializeRegistryInstructionAs
 import { getSolanaContext } from "../connection";
 
 export async function initializeRegistry(): Promise<{ activeGameCount: number }> {
-  const { rpc, rpcSubscriptions, adminSigner } = await getSolanaContext();
+  const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
 
-  const [registryAddress] = await findRegistryPda();
+  const [registryAddress] = await findRegistryPda({ programAddress });
 
   const existing = await fetchMaybeRegistry(rpc, registryAddress);
   if (existing.exists) {
     return { activeGameCount: existing.data.activeGames.length };
   }
 
-  const initializeInstruction = await getInitializeRegistryInstructionAsync({
-    admin: adminSigner,
-  });
+  const initializeInstruction = await getInitializeRegistryInstructionAsync(
+    { admin: adminSigner },
+    { programAddress },
+  );
 
   const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
 
