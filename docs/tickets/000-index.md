@@ -37,6 +37,7 @@ touches one of those areas.
 graph TD
     001["001 Repo bootstrap & connection utility"]
     002["002 Registry account + init"]
+    017["017 Frontend design foundation"]
     003["003 User registration & login"]
     004["004 Devnet deploy pipeline + Docker self-host"]
     005["005 Create game (General Mode, public)"]
@@ -53,6 +54,8 @@ graph TD
     016["016 General Pool Mode"]
 
     001 --> 002
+    001 --> 017
+    017 --> 003
     001 --> 003
     001 --> 004
     003 --> 004
