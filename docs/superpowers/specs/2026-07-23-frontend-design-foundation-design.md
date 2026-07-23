@@ -18,6 +18,23 @@ linked live design artifact was not needed as a fallback.
 
 ## Grill session — decisions
 
+### Q10: Does shadcn's Button pull in a Radix dependency after all?
+
+**Answer:** Yes, one small one — `@radix-ui/react-slot`, kept.
+
+**Decision:** shadcn's default `button.tsx` uses Radix's `Slot` to support the
+`asChild` prop (render Button's styles onto another element, e.g. a `Link`).
+This contradicts the earlier "no radix needed" framing in this doc and the
+`003-frontend-foundation-decisions.md` session — corrected here.
+`asChild`/`@radix-ui/react-slot` is kept as generated: no current consumer
+needs it, but ticket 003's login↔register flow plausibly wants a link styled
+as a button, and it's a ~1KB composition primitive, not a heavyweight
+component. `Input` and `Alert` genuinely pull in no Radix packages.
+
+**Reason:** Matches shadcn's own default output with zero extra customization
+there; stripping `asChild` now to save one small dependency, only to add it
+back the moment ticket 003 needs it, isn't worth the churn.
+
 ### Q1: Where do `admin/registry` and the home `page.tsx` (noop demo) sit relative to the new `(auth)`/`(app)` route groups?
 
 **Answer:** Both stay top-level, unmoved.
@@ -171,7 +188,7 @@ Keeps all three consistent and matches the ticket's literal wording.
 - `class-variance-authority`, `clsx`, `tailwind-merge` (ticket-specified, shadcn utils)
 - `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom` (devDependencies, test infra)
 - shadcn CLI itself is a one-time `npx shadcn@latest init` / `add` — not a persisted dependency
-- No `@radix-ui/react-*` packages: none of `Button`/`Input`/`Alert` use Radix primitives in shadcn's own implementation (only future `Dialog`/`Select`/`Dropdown` tickets will pull those in)
+- `@radix-ui/react-slot` (pulled in by `npx shadcn add button`): shadcn's default `button.tsx` uses Radix's `Slot` to support the `asChild` prop (render the button's styling onto another element, e.g. a `Link`). Kept — likely needed by ticket 003's login/register link-as-button pattern, and it's a small composition primitive, not a full component. `Input`/`Alert` pull in no Radix packages.
 - No new dependency for fonts (`next/font/google` ships with Next.js)
 
 ### Design tokens (`apps/frontend/src/app/globals.css`, `@theme` block)
