@@ -56,8 +56,8 @@ COPY apps/on-chain-program/programs apps/on-chain-program/programs
 COPY docker/local/fixtures/game_token_wallet-keypair.dev.json docker/local/fixtures/game_token_wallet-keypair.dev.json
 
 # Seed the fixed deploy-identity keypair before building — same reasoning
-# as CMD's own seeding step below (docker/local/fixtures/README.md):
-# `anchor build` mints a random keypair if
+# as scripts/deploy-local.sh's own seeding step (docker/local/fixtures/
+# README.md): `anchor build` mints a random keypair if
 # target/deploy/<program>-keypair.json is missing, which would drift this
 # image's baked program address away from
 # `declare_id!`/`Anchor.toml`/`PROGRAM_ID`.
@@ -65,22 +65,9 @@ RUN mkdir -p apps/on-chain-program/target/deploy && \
     cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json && \
     cd apps/on-chain-program && anchor build
 
-ENTRYPOINT ["sh", "-c"]
-# Airdrops to two distinct wallets: this container's fixed deployer keypair
-# (seeded above, pays for `anchor build`/`anchor deploy`) and, separately,
-# the frontend's SYSTEM_ADMIN_SECRET_KEY dev wallet (address
-# 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV, a fixed key set directly in
-# docker-compose.yml) — that wallet pays for every `noop` transaction the
-# frontend submits, and without funding it here every transaction fails
-# with "Attempt to debit an account but found no record of a prior credit."
-# Seeds target/deploy/game_token_wallet-keypair.json from the committed
-# throwaway fixture (docker/local/fixtures/game_token_wallet-keypair.dev.json,
-# see the README alongside it) BEFORE `anchor build` runs. That gitignored
-# keypair file is what determines the program's actual deployed address;
-# without seeding it here, `anchor build` mints a brand-new random keypair
-# whenever it's missing (fresh clone, another `anchor build` elsewhere on
-# the host, etc.), silently drifting the deployed address out of sync with
-# the `declare_id!`/`Anchor.toml`/`PROGRAM_ID` values committed to source.
-# Seeding from a fixed, committed fixture guarantees the same deployed
-# address on every container run, on every machine.
-CMD ["mkdir -p apps/on-chain-program/target/deploy && cp docker/local/fixtures/game_token_wallet-keypair.dev.json apps/on-chain-program/target/deploy/game_token_wallet-keypair.json && solana airdrop 10 --url \"$ANCHOR_PROVIDER_URL\" && solana airdrop 10 8BLQ33YJwJriwmS5RYYzkUfQp6ZwViXodKf1LcEZSsVV --url \"$ANCHOR_PROVIDER_URL\" && cd apps/on-chain-program && anchor build && anchor deploy --provider.cluster \"$ANCHOR_PROVIDER_URL\" && cd ../.. && pnpm install --frozen-lockfile && pnpm --filter on-chain-client run codegen"]
+# Deploy logic lives in scripts/deploy-local.sh (keypair seeding, airdrops,
+# `anchor build`/`deploy`, client codegen — see that file for the full
+# rationale behind each step). Not COPYed into the image: docker-compose.yml's
+# `.:/workspace` bind mount supplies it at container start, same as the rest
+# of the repo, so edits take effect without a rebuild.
+ENTRYPOINT ["scripts/deploy-local.sh"]
