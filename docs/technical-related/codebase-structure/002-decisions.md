@@ -264,3 +264,39 @@ A second top-level source root for exactly one project-internal package
 wasn't earning its keep. `apps/` becomes the single root for all workspace
 code; if a genuinely reusable/publishable package appears later, that's a
 new decision to make then, not a reason to keep the glob now (YAGNI).
+
+---
+
+## Q15: How should ticket 001 prove the connection utility's plumbing actually works end to end, not just that the Rust compiles?
+
+**Answer:** A Server Action, invoked from a page, that calls the program's
+`noop` instruction through the connection utility and displays the returned
+transaction signature.
+
+**Decision:** `apps/frontend/src/app/page.tsx` renders a button that
+triggers a Server Action (`sendNoopTransaction`), which resolves the lazy
+singleton connection/signer, sends `noop`, and returns the signature to
+render. `apps/e2e`'s one real Playwright test exercises this exact path
+(click button → assert a valid-looking signature renders).
+
+**Reason:** The connection utility is server-side infrastructure — the only
+way to prove it actually works is to exercise the full client → Server
+Action → connection utility → program → chain path, not just confirm
+`anchor build` succeeds.
+
+---
+
+## Q16: How far should ticket 001 scaffold `apps/on-chain-program-e2e` and `apps/e2e`, given neither has real product logic to test yet?
+
+**Answer:** Minimal but *real* skeleton apps now — not placeholder CI
+stanzas — each wired into CI with one genuinely passing test.
+
+**Decision:** `on-chain-program-e2e` gets one Anchor-test-harness sanity
+check; `e2e` gets the one non-vacuous assertion described in Q15. Both run
+for real in `.circleci/config.yml` from ticket 001 onward.
+
+**Reason:** [001-CODEBASE-STRUCTURE.md](./001-CODEBASE-STRUCTURE.md)
+already lists both as existing top-level apps — a placeholder-only CI
+stanza would leave the tree inconsistent with the documented structure. A
+real (if trivial) green CI job is also a stronger signal than a TODO
+comment that could silently rot.

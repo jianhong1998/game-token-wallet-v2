@@ -41,22 +41,40 @@ on-chain patterns (PDA seed conventions, `close_*` rent-reclaim style).
 - Multi-tenancy was **dropped** (architecture Q3): one deployment = one system
   admin wallet, one global namespace of users/games. A tenant that wants
   isolation runs its own full deployment rather than sharing a program.
-- Config read from environment variables at runtime (not build time):
-  - Solana cluster/validator RPC URL
-  - System admin wallet keypair
-  - Deployed program ID (read from env, **not** the hardcoded address in the
-    Anchor IDL — ticket 004)
+- Config read from environment variables at runtime (not build time), all
+  required with no silent fallback — missing/malformed throws (ticket 001):
+
+  | Var                      | Shape                                       |
+  | ------------------------- | -------------------------------------------- |
+  | `SYSTEM_ADMIN_SECRET_KEY` | base58-encoded 64-byte secret key           |
+  | `SOLANA_CLUSTER`          | `localnet \| devnet \| mainnet-beta`        |
+  | `SOLANA_RPC_URL`          | explicit RPC endpoint URL, always required  |
+  | `PROGRAM_ID`              | base58 pubkey (read from env, **not** the hardcoded address in the Anchor IDL — ticket 004) |
+
+  A single base58 string for the admin key (not a JSON byte array) was
+  chosen for the simplest injection as a CI/docker secret — no file
+  mounting, no array parsing, identical shape across CircleCI env vars,
+  `.env` files, and container runtime env. `SOLANA_RPC_URL` is always
+  required rather than inferred from `SOLANA_CLUSTER`, to avoid silently
+  falling back to public default endpoints, which are heavily rate-limited
+  and unsuitable even for local/dev use.
 
 ## On-Chain Program
 
 | Concern          | Choice                                                                   |
 | ---------------- | ------------------------------------------------------------------------ |
 | Language         | Rust                                                                     |
-| Framework        | Anchor                                                                   |
+| Framework        | Anchor **1.x** (latest stable via AVM, not 0.30.x)                       |
 | Tooling          | Solana CLI, `anchor build` / `anchor test`                               |
 | Local network    | Surfpool, run via docker compose (`solana-test-validator` is deprecated) |
 | Deployed network | Devnet                                                                   |
 
+- **Anchor 1.x, not 0.30.x** (ticket 001): Anchor 1.0 made Surfpool/LiteSVM
+  the default test backend and dropped Anchor's own dependency on the
+  external Solana CLI for its built-in commands — lines up natively with
+  the Surfpool-first local dev loop above. No legacy Anchor 0.3x code to
+  preserve since this is a new repo, so no reason to start on the older
+  line.
 - **No off-chain database.** All persistent state — users, games, balances —
   lives in on-chain accounts. The Next.js server is stateless aside from the
   admin signing key.
