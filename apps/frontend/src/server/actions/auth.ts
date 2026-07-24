@@ -39,6 +39,17 @@ async function setSessionCookie(username: string): Promise<void> {
   // serves plain HTTP in e2e/local Docker stacks with no TLS-terminating
   // reverse proxy in front. Browsers refuse to store a Secure cookie over a
   // non-HTTPS connection, so gating on NODE_ENV silently drops every session.
+  // TRUST BOUNDARY: this trusts x-forwarded-proto to decide the cookie's
+  // Secure flag. That's only safe if this deployment's reverse proxy/load
+  // balancer (if any) always OVERWRITES this header rather than passing
+  // through a client-supplied value — the same trust boundary required by
+  // any framework that reads this header (Express's `trust proxy`, Rails'
+  // `config.force_ssl`, etc.). If there's no reverse proxy at all, the
+  // header is simply absent on every real request (browsers never send it
+  // themselves), so `secure` correctly defaults to false — fail-safe, not
+  // fail-open. Operators terminating TLS at a reverse proxy MUST ensure it
+  // does not forward an untrusted client-supplied X-Forwarded-Proto header
+  // to this app.
   const isHttps = requestHeaders.get("x-forwarded-proto") === "https";
   cookieStore.set(SESSION_COOKIE_NAME, sessionCookie, {
     httpOnly: true,
