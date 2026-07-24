@@ -35,7 +35,7 @@ const { mockCookieStore } = vi.hoisted(() => ({
 }));
 vi.mock("next/headers", () => ({ cookies: async () => mockCookieStore }));
 
-import { registerUser } from "./auth";
+import { registerUser, loginUser, logoutUser, getCurrentUsername } from "./auth";
 
 const USER_ADDRESS = "User1111111111111111111111111111111111111";
 const ADMIN_ADDRESS = "Admin111111111111111111111111111111111111";
@@ -121,5 +121,89 @@ describe("registerUser", () => {
       registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef12" }),
     ).rejects.toThrow("Username already taken");
     expect(mockCookieStore.set).not.toHaveBeenCalled();
+  });
+});
+
+describe("loginUser", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SESSION_SECRET = "test-session-secret-value-not-used-in-prod";
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {},
+      rpcSubscriptions: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: "Prog1111111111111111111111111111111111111",
+    });
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+  });
+
+  it("sets a session cookie when the password is correct", async () => {
+    const { hashPassword } = await import("../password");
+    const { salt, hash } = await hashPassword("Abcdef12");
+    mockFetchMaybeUser.mockResolvedValue({
+      exists: true,
+      address: USER_ADDRESS,
+      data: userData({ salt, passwordHash: hash }),
+    } as MaybeAccount<User>);
+
+    await loginUser({ username: "alice", password: "Abcdef12" });
+
+    expect(mockCookieStore.set).toHaveBeenCalledWith(
+      "session",
+      expect.any(String),
+      expect.objectContaining({ httpOnly: true }),
+    );
+  });
+
+  it("throws a generic error when the password is wrong", async () => {
+    const { hashPassword } = await import("../password");
+    const { salt, hash } = await hashPassword("Abcdef12");
+    mockFetchMaybeUser.mockResolvedValue({
+      exists: true,
+      address: USER_ADDRESS,
+      data: userData({ salt, passwordHash: hash }),
+    } as MaybeAccount<User>);
+
+    await expect(loginUser({ username: "alice", password: "wrong-password" })).rejects.toThrow(
+      "Invalid username or password",
+    );
+    expect(mockCookieStore.set).not.toHaveBeenCalled();
+  });
+
+  it("throws the identical generic error when the username doesn't exist", async () => {
+    mockFetchMaybeUser.mockResolvedValue({ exists: false } as MaybeAccount<User>);
+
+    await expect(loginUser({ username: "nobody", password: "Abcdef12" })).rejects.toThrow(
+      "Invalid username or password",
+    );
+    expect(mockCookieStore.set).not.toHaveBeenCalled();
+  });
+});
+
+describe("logoutUser", () => {
+  it("clears the session cookie", async () => {
+    vi.clearAllMocks();
+    await logoutUser();
+    expect(mockCookieStore.delete).toHaveBeenCalledWith("session");
+  });
+});
+
+describe("getCurrentUsername", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SESSION_SECRET = "test-session-secret-value-not-used-in-prod";
+  });
+
+  it("returns null when there is no session cookie", async () => {
+    mockCookieStore.get.mockReturnValue(undefined);
+    await expect(getCurrentUsername()).resolves.toBeNull();
+  });
+
+  it("returns the username from a valid session cookie", async () => {
+    const { createSessionCookie } = await import("../session");
+    const cookie = await createSessionCookie("alice");
+    mockCookieStore.get.mockReturnValue({ value: cookie });
+
+    await expect(getCurrentUsername()).resolves.toBe("alice");
   });
 });
