@@ -25,11 +25,15 @@ export default function RegisterPage() {
     event.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await registerUser({ username, password, confirmPassword });
-      if (result.ok) {
-        router.push("/home");
-      } else {
-        setError(result.error);
+      try {
+        const result = await registerUser({ username, password, confirmPassword });
+        if (result.ok) {
+          router.push("/home");
+        } else {
+          setError(result.error);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       }
     });
   }

@@ -37,4 +37,16 @@ describe("LoginPage", () => {
 
     expect(await screen.findByTestId("login-error")).toHaveTextContent("Invalid username or password");
   });
+
+  it("shows a fallback error alert when loginUser throws an unexpected error", async () => {
+    mockLoginUser.mockRejectedValue(new Error("Network error"));
+    const user = userEvent.setup();
+    render(<LoginPage />);
+    await user.type(screen.getByPlaceholderText("Username"), "alice");
+    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(await screen.findByTestId("login-error")).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

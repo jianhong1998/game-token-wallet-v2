@@ -59,4 +59,17 @@ describe("RegisterPage", () => {
 
     expect(await screen.findByTestId("register-error")).toHaveTextContent("Username already taken");
   });
+
+  it("shows a fallback error alert when registerUser throws an unexpected error", async () => {
+    mockRegisterUser.mockRejectedValue(new Error("Network error"));
+    const user = userEvent.setup();
+    render(<RegisterPage />);
+    await user.type(screen.getByPlaceholderText("Username"), "alice");
+    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
+    await user.type(screen.getByPlaceholderText("Confirm password"), "Abcdef12");
+    await user.click(screen.getByRole("button", { name: "Register" }));
+
+    expect(await screen.findByTestId("register-error")).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

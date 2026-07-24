@@ -18,11 +18,15 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await loginUser({ username, password });
-      if (result.ok) {
-        router.push("/home");
-      } else {
-        setError(result.error);
+      try {
+        const result = await loginUser({ username, password });
+        if (result.ok) {
+          router.push("/home");
+        } else {
+          setError(result.error);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       }
     });
   }
