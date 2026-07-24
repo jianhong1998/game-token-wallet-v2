@@ -25,11 +25,11 @@ export default function RegisterPage() {
     event.preventDefault();
     setError(null);
     startTransition(async () => {
-      try {
-        await registerUser({ username, password, confirmPassword });
+      const result = await registerUser({ username, password, confirmPassword });
+      if (result.ok) {
         router.push("/home");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+      } else {
+        setError(result.error);
       }
     });
   }

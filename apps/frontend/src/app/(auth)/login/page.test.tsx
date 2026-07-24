@@ -16,7 +16,7 @@ describe("LoginPage", () => {
   });
 
   it("submits and redirects to /home on success", async () => {
-    mockLoginUser.mockResolvedValue(undefined);
+    mockLoginUser.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
     render(<LoginPage />);
     await user.type(screen.getByPlaceholderText("Username"), "alice");
@@ -28,7 +28,7 @@ describe("LoginPage", () => {
   });
 
   it("shows the generic error alert when login fails", async () => {
-    mockLoginUser.mockRejectedValue(new Error("Invalid username or password"));
+    mockLoginUser.mockResolvedValue({ ok: false, error: "Invalid username or password" });
     const user = userEvent.setup();
     render(<LoginPage />);
     await user.type(screen.getByPlaceholderText("Username"), "alice");

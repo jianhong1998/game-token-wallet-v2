@@ -30,10 +30,16 @@ vi.mock("@solana/kit", async (importOriginal) => {
   };
 });
 
-const { mockCookieStore } = vi.hoisted(() => ({
+const { mockCookieStore, mockHeadersStore } = vi.hoisted(() => ({
   mockCookieStore: { get: vi.fn(), set: vi.fn(), delete: vi.fn() },
+  // Defaults to no `x-forwarded-proto` header, i.e. plain HTTP with no
+  // TLS-terminating reverse proxy in front — the e2e/local Docker case.
+  mockHeadersStore: { get: vi.fn() },
 }));
-vi.mock("next/headers", () => ({ cookies: async () => mockCookieStore }));
+vi.mock("next/headers", () => ({
+  cookies: async () => mockCookieStore,
+  headers: async () => mockHeadersStore,
+}));
 
 import { registerUser, loginUser, logoutUser, getCurrentUsername } from "./auth";
 
@@ -76,36 +82,64 @@ describe("registerUser", () => {
   });
 
   it("rejects an invalid username before touching the chain", async () => {
-    await expect(
-      registerUser({ username: "a!", password: "Abcdef12", confirmPassword: "Abcdef12" }),
-    ).rejects.toThrow();
+    const result = await registerUser({ username: "a!", password: "Abcdef12", confirmPassword: "Abcdef12" });
+    expect(result.ok).toBe(false);
     expect(mockGetSolanaContext).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid password before touching the chain", async () => {
-    await expect(
-      registerUser({ username: "alice", password: "short", confirmPassword: "short" }),
-    ).rejects.toThrow();
+    const result = await registerUser({ username: "alice", password: "short", confirmPassword: "short" });
+    expect(result.ok).toBe(false);
     expect(mockGetSolanaContext).not.toHaveBeenCalled();
   });
 
   it("rejects mismatched confirm-password before touching the chain", async () => {
     await expect(
       registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef13" }),
-    ).rejects.toThrow("Passwords do not match");
+    ).resolves.toEqual({ ok: false, error: "Passwords do not match" });
     expect(mockGetSolanaContext).not.toHaveBeenCalled();
   });
 
   it("creates the on-chain account and sets a session cookie on success", async () => {
     mockFetchMaybeUser.mockResolvedValue({ exists: false } as MaybeAccount<User>);
 
-    await registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef12" });
+    await expect(
+      registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef12" }),
+    ).resolves.toEqual({ ok: true });
 
     expect(mockSendAndConfirmTransaction).toHaveBeenCalledTimes(1);
     expect(mockCookieStore.set).toHaveBeenCalledWith(
       "session",
       expect.any(String),
-      expect.objectContaining({ httpOnly: true }),
+      expect.objectContaining({ httpOnly: true, secure: false }),
+    );
+  });
+
+  it("sets secure:true on the session cookie when x-forwarded-proto is https", async () => {
+    mockFetchMaybeUser.mockResolvedValue({ exists: false } as MaybeAccount<User>);
+    mockHeadersStore.get.mockImplementation((name: string) =>
+      name === "x-forwarded-proto" ? "https" : null,
+    );
+
+    await registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef12" });
+
+    expect(mockCookieStore.set).toHaveBeenCalledWith(
+      "session",
+      expect.any(String),
+      expect.objectContaining({ secure: true }),
+    );
+  });
+
+  it("sets secure:false on the session cookie when x-forwarded-proto is absent", async () => {
+    mockFetchMaybeUser.mockResolvedValue({ exists: false } as MaybeAccount<User>);
+    mockHeadersStore.get.mockReturnValue(null);
+
+    await registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef12" });
+
+    expect(mockCookieStore.set).toHaveBeenCalledWith(
+      "session",
+      expect.any(String),
+      expect.objectContaining({ secure: false }),
     );
   });
 
@@ -119,7 +153,7 @@ describe("registerUser", () => {
 
     await expect(
       registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef12" }),
-    ).rejects.toThrow("Username already taken");
+    ).resolves.toEqual({ ok: false, error: "Username already taken" });
     expect(mockCookieStore.set).not.toHaveBeenCalled();
   });
 });
@@ -146,16 +180,16 @@ describe("loginUser", () => {
       data: userData({ salt, passwordHash: hash }),
     } as MaybeAccount<User>);
 
-    await loginUser({ username: "alice", password: "Abcdef12" });
+    await expect(loginUser({ username: "alice", password: "Abcdef12" })).resolves.toEqual({ ok: true });
 
     expect(mockCookieStore.set).toHaveBeenCalledWith(
       "session",
       expect.any(String),
-      expect.objectContaining({ httpOnly: true }),
+      expect.objectContaining({ httpOnly: true, secure: false }),
     );
   });
 
-  it("throws a generic error when the password is wrong", async () => {
+  it("returns a generic error when the password is wrong", async () => {
     const { hashPassword } = await import("../password");
     const { salt, hash } = await hashPassword("Abcdef12");
     mockFetchMaybeUser.mockResolvedValue({
@@ -164,18 +198,20 @@ describe("loginUser", () => {
       data: userData({ salt, passwordHash: hash }),
     } as MaybeAccount<User>);
 
-    await expect(loginUser({ username: "alice", password: "wrong-password" })).rejects.toThrow(
-      "Invalid username or password",
-    );
+    await expect(loginUser({ username: "alice", password: "wrong-password" })).resolves.toEqual({
+      ok: false,
+      error: "Invalid username or password",
+    });
     expect(mockCookieStore.set).not.toHaveBeenCalled();
   });
 
-  it("throws the identical generic error when the username doesn't exist", async () => {
+  it("returns the identical generic error when the username doesn't exist", async () => {
     mockFetchMaybeUser.mockResolvedValue({ exists: false } as MaybeAccount<User>);
 
-    await expect(loginUser({ username: "nobody", password: "Abcdef12" })).rejects.toThrow(
-      "Invalid username or password",
-    );
+    await expect(loginUser({ username: "nobody", password: "Abcdef12" })).resolves.toEqual({
+      ok: false,
+      error: "Invalid username or password",
+    });
     expect(mockCookieStore.set).not.toHaveBeenCalled();
   });
 });

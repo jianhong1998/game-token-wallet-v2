@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   createTransactionMessage,
   pipe,
@@ -32,30 +32,40 @@ export interface RegisterUserInput {
 async function setSessionCookie(username: string): Promise<void> {
   const sessionCookie = await createSessionCookie(username);
   const cookieStore = await cookies();
+  const requestHeaders = await headers();
+  // secure must reflect the actual inbound request's protocol, not build mode:
+  // NODE_ENV is unconditionally "production" in the frontend's production
+  // Docker image (next build && next start), but that image is also what
+  // serves plain HTTP in e2e/local Docker stacks with no TLS-terminating
+  // reverse proxy in front. Browsers refuse to store a Secure cookie over a
+  // non-HTTPS connection, so gating on NODE_ENV silently drops every session.
+  const isHttps = requestHeaders.get("x-forwarded-proto") === "https";
   cookieStore.set(SESSION_COOKIE_NAME, sessionCookie, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: process.env.NODE_ENV === "production",
+    secure: isHttps,
     maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
   });
 }
 
-export async function registerUser(input: RegisterUserInput): Promise<void> {
+export type AuthActionResult = { ok: true } | { ok: false; error: string };
+
+export async function registerUser(input: RegisterUserInput): Promise<AuthActionResult> {
   const normalizedUsername = normalizeUsername(input.username);
 
   const usernameCheck = validateUsername(normalizedUsername);
   if (!usernameCheck.valid) {
-    throw new Error(usernameCheck.reason);
+    return { ok: false, error: usernameCheck.reason };
   }
 
   const passwordCheck = validatePassword(input.password);
   if (!passwordCheck.valid) {
-    throw new Error(passwordCheck.reason);
+    return { ok: false, error: passwordCheck.reason };
   }
 
   if (input.password !== input.confirmPassword) {
-    throw new Error("Passwords do not match");
+    return { ok: false, error: "Passwords do not match" };
   }
 
   const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
@@ -91,12 +101,13 @@ export async function registerUser(input: RegisterUserInput): Promise<void> {
     );
     const existing = await fetchMaybeUser(rpc, userAddress);
     if (existing.exists) {
-      throw new Error("Username already taken", { cause: error });
+      return { ok: false, error: "Username already taken" };
     }
     throw error;
   }
 
   await setSessionCookie(normalizedUsername);
+  return { ok: true };
 }
 
 export interface LoginUserInput {
@@ -106,7 +117,7 @@ export interface LoginUserInput {
 
 const INVALID_CREDENTIALS_MESSAGE = "Invalid username or password";
 
-export async function loginUser(input: LoginUserInput): Promise<void> {
+export async function loginUser(input: LoginUserInput): Promise<AuthActionResult> {
   const normalizedUsername = normalizeUsername(input.username);
   const { rpc, adminSigner, programAddress } = await getSolanaContext();
 
@@ -120,7 +131,7 @@ export async function loginUser(input: LoginUserInput): Promise<void> {
     // Still pay the scrypt cost even though there's no account, so response
     // timing doesn't reveal that this username doesn't exist.
     await runDummyHash(input.password);
-    throw new Error(INVALID_CREDENTIALS_MESSAGE);
+    return { ok: false, error: INVALID_CREDENTIALS_MESSAGE };
   }
 
   const passwordMatches = await verifyPassword(
@@ -130,10 +141,11 @@ export async function loginUser(input: LoginUserInput): Promise<void> {
   );
 
   if (!passwordMatches) {
-    throw new Error(INVALID_CREDENTIALS_MESSAGE);
+    return { ok: false, error: INVALID_CREDENTIALS_MESSAGE };
   }
 
   await setSessionCookie(normalizedUsername);
+  return { ok: true };
 }
 
 export async function logoutUser(): Promise<void> {

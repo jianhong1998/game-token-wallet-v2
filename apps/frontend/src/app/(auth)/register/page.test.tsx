@@ -32,7 +32,7 @@ describe("RegisterPage", () => {
   });
 
   it("submits and redirects to /home on success", async () => {
-    mockRegisterUser.mockResolvedValue(undefined);
+    mockRegisterUser.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
     render(<RegisterPage />);
     await user.type(screen.getByPlaceholderText("Username"), "alice");
@@ -49,7 +49,7 @@ describe("RegisterPage", () => {
   });
 
   it("shows the error alert when registration fails", async () => {
-    mockRegisterUser.mockRejectedValue(new Error("Username already taken"));
+    mockRegisterUser.mockResolvedValue({ ok: false, error: "Username already taken" });
     const user = userEvent.setup();
     render(<RegisterPage />);
     await user.type(screen.getByPlaceholderText("Username"), "alice");

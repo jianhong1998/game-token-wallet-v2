@@ -18,11 +18,11 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
     startTransition(async () => {
-      try {
-        await loginUser({ username, password });
+      const result = await loginUser({ username, password });
+      if (result.ok) {
         router.push("/home");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+      } else {
+        setError(result.error);
       }
     });
   }
