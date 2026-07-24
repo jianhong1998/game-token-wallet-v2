@@ -51,4 +51,18 @@ describe("Button", () => {
     const loadingWidth = container.querySelector("button")!.getBoundingClientRect().width;
     expect(loadingWidth).toBe(idleWidth);
   });
+
+  it("with asChild, clones Button's props directly onto the consumer's element", () => {
+    render(
+      <Button asChild>
+        <a href="/x" data-testid="link-target">
+          Go
+        </a>
+      </Button>,
+    );
+    const link = screen.getByTestId("link-target");
+    expect(link.tagName).toBe("A");
+    expect(link).toHaveAttribute("href", "/x");
+    expect(link).toHaveClass("bg-gradient-primary");
+  });
 });

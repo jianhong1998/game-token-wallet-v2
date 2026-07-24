@@ -38,6 +38,20 @@ function Button({
 }: ButtonProps) {
   const Comp = asChild ? Slot : "button";
 
+  if (asChild) {
+    return (
+      <Comp
+        data-slot="button"
+        className={cn(buttonVariants({ variant, className }))}
+        disabled={disabled || isLoading}
+        aria-busy={isLoading || undefined}
+        {...props}
+      >
+        {children}
+      </Comp>
+    );
+  }
+
   return (
     <span className="relative inline-flex">
       <Comp
