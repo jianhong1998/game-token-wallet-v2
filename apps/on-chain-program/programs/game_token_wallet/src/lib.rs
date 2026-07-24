@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+mod errors;
 mod instructions;
 mod state;
 
@@ -21,6 +22,15 @@ pub mod game_token_wallet {
 
     pub fn initialize_registry(ctx: Context<InitializeRegistry>) -> Result<()> {
         instructions::registry::initialize::handler(ctx)
+    }
+
+    pub fn create_user(
+        ctx: Context<CreateUser>,
+        username: String,
+        salt: [u8; 16],
+        password_hash: [u8; 64],
+    ) -> Result<()> {
+        instructions::user::create_user::handler(ctx, username, salt, password_hash)
     }
 }
 
