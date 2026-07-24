@@ -44,12 +44,29 @@ describe("Button", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it("keeps the same rendered width while isLoading as while idle", () => {
-    const { rerender, container } = render(<Button>Initialize registry</Button>);
-    const idleWidth = container.querySelector("button")!.getBoundingClientRect().width;
+  it("hides content via 'invisible' rather than 'hidden', and never changes the button's own sizing classes, while isLoading", () => {
+    const { rerender } = render(<Button>Initialize registry</Button>);
+
+    const idleButton = screen.getByRole("button", { name: "Initialize registry" });
+    const idleClassName = idleButton.className;
+    const idleContent = screen.getByText("Initialize registry");
+    expect(idleContent).not.toHaveClass("invisible");
+    expect(idleContent).not.toHaveClass("hidden");
+
     rerender(<Button isLoading>Initialize registry</Button>);
-    const loadingWidth = container.querySelector("button")!.getBoundingClientRect().width;
-    expect(loadingWidth).toBe(idleWidth);
+
+    // The button's own className (padding/sizing from buttonVariants) must be
+    // identical whether idle or loading — isLoading only toggles `disabled`
+    // and `aria-busy`, never the button's own box-sizing classes.
+    const loadingButton = screen.getByRole("button", { name: "Initialize registry" });
+    expect(loadingButton.className).toBe(idleClassName);
+
+    // Loading-state children must be hidden via `invisible` (stays in layout
+    // flow, preserving width), never via `hidden` (which collapses the
+    // layout box and would shift the button's rendered width).
+    const loadingContent = screen.getByText("Initialize registry");
+    expect(loadingContent).toHaveClass("invisible");
+    expect(loadingContent).not.toHaveClass("hidden");
   });
 
   it("with asChild, clones Button's props directly onto the consumer's element", () => {
