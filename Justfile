@@ -67,7 +67,9 @@ test:
   @pnpm --filter frontend run test
   @pnpm --filter on-chain-client run test
   @cd apps/on-chain-program && anchor test
-  @docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+  @docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from on-chain-program-e2e surfpool program-deploy on-chain-program-e2e
+  @docker compose -f docker-compose.e2e.yml down
+  @docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e surfpool program-deploy frontend e2e
 
 
 [group: 'On-Chain Program']
