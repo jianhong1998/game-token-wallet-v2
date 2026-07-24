@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { loadSolanaEnv } from "./env";
+import { loadSolanaEnv, loadSessionEnv } from "./env";
 
 const REQUIRED_VARS = ["SOLANA_CLUSTER", "SOLANA_RPC_URL", "PROGRAM_ID", "SYSTEM_ADMIN_SECRET_KEY"];
 
@@ -39,5 +39,22 @@ describe("loadSolanaEnv", () => {
     setValidEnv();
     process.env.SOLANA_CLUSTER = "testnet";
     expect(() => loadSolanaEnv()).toThrow(/Invalid SOLANA_CLUSTER/);
+  });
+});
+
+describe("loadSessionEnv", () => {
+  beforeEach(() => {
+    delete process.env.SESSION_SECRET;
+  });
+
+  it("returns the session secret when set", () => {
+    process.env.SESSION_SECRET = "a-long-random-test-secret";
+    expect(loadSessionEnv()).toEqual({ sessionSecret: "a-long-random-test-secret" });
+  });
+
+  it("throws when SESSION_SECRET is missing", () => {
+    expect(() => loadSessionEnv()).toThrow(
+      "Missing required environment variable: SESSION_SECRET",
+    );
   });
 });
