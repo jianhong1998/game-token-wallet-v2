@@ -31,3 +31,13 @@ export function loadSolanaEnv(): SolanaEnv {
     adminSecretKeyBase58: readRequiredEnvVar("SYSTEM_ADMIN_SECRET_KEY"),
   };
 }
+
+export interface SessionEnv {
+  sessionSecret: string;
+}
+
+export function loadSessionEnv(): SessionEnv {
+  return {
+    sessionSecret: readRequiredEnvVar("SESSION_SECRET"),
+  };
+}
