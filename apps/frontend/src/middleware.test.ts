@@ -35,6 +35,12 @@ describe("middleware", () => {
     expect(response.headers.get("location")).toBeNull();
   });
 
+  it("redirects to /login for a path that merely shares the /admin string prefix", async () => {
+    const request = new NextRequest("http://localhost/administrator");
+    const response = await middleware(request);
+    expect(response.headers.get("location")).toBe("http://localhost/login");
+  });
+
   it("redirects to /login when there is no session cookie on a protected route", async () => {
     const request = new NextRequest("http://localhost/home");
     const response = await middleware(request);

@@ -10,7 +10,9 @@ const PUBLIC_PATHS = new Set(["/", "/login", "/register"]);
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith("/admin")) {
+  const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  if (PUBLIC_PATHS.has(pathname) || isAdminPath) {
     return NextResponse.next();
   }
 
