@@ -61,7 +61,7 @@ function Button({
         aria-busy={isLoading || undefined}
         {...props}
       >
-        <span className={isLoading ? "invisible" : undefined}>{children}</span>
+        <span className={isLoading ? "opacity-0" : undefined}>{children}</span>
       </Comp>
       {isLoading && (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
