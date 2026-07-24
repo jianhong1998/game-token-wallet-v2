@@ -15,7 +15,6 @@ touches one of those areas.
 | --- | ----------------------------------------- | ---------- | ------- |
 | 001 | Repo bootstrap & connection utility       | None       | Done    |
 | 002 | Registry account + init                   | 001        | Done    |
-| 017 | Frontend design foundation                | 001        | Pending |
 | 003 | User registration & login                 | 001, 017   | Pending |
 | 004 | Devnet deploy pipeline + Docker self-host | 001, 003   | Pending |
 | 005 | Create game (General Mode, public)        | 002, 003   | Pending |
@@ -30,6 +29,7 @@ touches one of those areas.
 | 014 | Poker Mode: single pot                    | 006, 008   | Pending |
 | 015 | Poker Mode: side pots                     | 014, 013   | Pending |
 | 016 | General Pool Mode                         | 008, 013   | Pending |
+| 017 | Frontend design foundation                | 001        | Done    |
 
 ## Dependency diagram
 
