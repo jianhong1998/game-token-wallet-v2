@@ -109,6 +109,7 @@ services:
       - on_chain_program_e2e_node_modules:/workspace/apps/on-chain-program-e2e/node_modules
       - e2e_node_modules:/workspace/apps/e2e/node_modules
       - on_chain_client_node_modules:/workspace/apps/on-chain-client/node_modules
+      - frontend_next:/workspace/apps/frontend/.next
 
 volumes:
   surfpool_data:
@@ -120,3 +121,4 @@ volumes:
   on_chain_program_target:
   cargo_registry:
   solana_platform_tools_cache:
+  frontend_next:

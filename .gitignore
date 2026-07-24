@@ -18,6 +18,7 @@ temp
 .next/
 dist/
 target/
+apps/frontend/next-env.d.ts
 !apps/on-chain-program/target/idl/
 
 # Logs

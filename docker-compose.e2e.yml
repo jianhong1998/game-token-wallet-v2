@@ -28,11 +28,12 @@ services:
       ANCHOR_PROVIDER_URL: http://surfpool:8899
     # Dockerfile.anchor's ENTRYPOINT (scripts/deploy-local.sh) exits 0 as
     # soon as deploy/codegen finishes — correct for docker-compose.yml's dev
-    # loop, where nothing else races that exit. Here, the required
-    # verification command (`up --build --abort-on-container-exit
-    # --exit-code-from e2e`, no positional service args — same command
-    # Task 11's CircleCI `e2e` job runs) treats every service as "explicit",
-    # and --abort-on-container-exit aborts the WHOLE stack the instant ANY
+    # loop, where nothing else races that exit. Here, both CircleCI's `e2e`
+    # job and `just test`'s second docker-compose invocation run this
+    # service via a positional-arg-scoped `up --build
+    # --abort-on-container-exit --exit-code-from e2e ... program-deploy
+    # ...`, which treats every listed service as "explicit", and
+    # --abort-on-container-exit aborts the WHOLE stack the instant ANY
     # explicit container exits — even a one-shot dependency container that
     # exited 0 on purpose. This is a documented Compose limitation, not an
     # application bug (see docker/compose#10233, #13223): confirmed
