@@ -53,7 +53,7 @@ function Button({
   }
 
   return (
-    <span className="relative inline-flex">
+    <span className="relative inline-flex self-start">
       <Comp
         data-slot="button"
         className={cn(buttonVariants({ variant, className }))}
