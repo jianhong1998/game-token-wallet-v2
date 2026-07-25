@@ -33,7 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col py-16">
+    <>
       <h1 className="bg-gradient-primary bg-clip-text text-3xl font-extrabold text-transparent">
         Kitty
       </h1>
@@ -83,6 +83,6 @@ export default function LoginPage() {
           Create an account
         </Link>
       </p>
-    </main>
+    </>
   );
 }

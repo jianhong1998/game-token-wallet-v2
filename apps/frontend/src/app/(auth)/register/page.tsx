@@ -40,7 +40,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col py-16">
+    <>
       <h1 className="text-3xl font-extrabold text-text-primary">Create account</h1>
       <p className="mt-2 text-sm font-semibold text-text-secondary">
         8–20 characters, letters/numbers/basic symbols only.
@@ -116,6 +116,6 @@ export default function RegisterPage() {
           Log in
         </Link>
       </p>
-    </main>
+    </>
   );
 }
