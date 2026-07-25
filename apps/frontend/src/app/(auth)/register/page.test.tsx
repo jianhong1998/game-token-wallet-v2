@@ -18,7 +18,7 @@ describe("RegisterPage", () => {
   it("shows a live hint for an invalid username without submitting", async () => {
     const user = userEvent.setup();
     render(<RegisterPage />);
-    await user.type(screen.getByPlaceholderText("Username"), "a!");
+    await user.type(screen.getByLabelText("Username"), "a!");
     expect(await screen.findByTestId("username-hint")).toBeInTheDocument();
     expect(mockRegisterUser).not.toHaveBeenCalled();
   });
@@ -26,8 +26,8 @@ describe("RegisterPage", () => {
   it("shows a live hint when confirm password doesn't match", async () => {
     const user = userEvent.setup();
     render(<RegisterPage />);
-    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
-    await user.type(screen.getByPlaceholderText("Confirm password"), "Abcdef13");
+    await user.type(screen.getByLabelText("Password"), "Abcdef12");
+    await user.type(screen.getByLabelText("Confirm password"), "Abcdef13");
     expect(await screen.findByTestId("confirm-password-hint")).toBeInTheDocument();
   });
 
@@ -35,10 +35,10 @@ describe("RegisterPage", () => {
     mockRegisterUser.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
     render(<RegisterPage />);
-    await user.type(screen.getByPlaceholderText("Username"), "alice");
-    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
-    await user.type(screen.getByPlaceholderText("Confirm password"), "Abcdef12");
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.type(screen.getByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "Abcdef12");
+    await user.type(screen.getByLabelText("Confirm password"), "Abcdef12");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/home"));
     expect(mockRegisterUser).toHaveBeenCalledWith({
@@ -52,10 +52,10 @@ describe("RegisterPage", () => {
     mockRegisterUser.mockResolvedValue({ ok: false, error: "Username already taken" });
     const user = userEvent.setup();
     render(<RegisterPage />);
-    await user.type(screen.getByPlaceholderText("Username"), "alice");
-    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
-    await user.type(screen.getByPlaceholderText("Confirm password"), "Abcdef12");
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.type(screen.getByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "Abcdef12");
+    await user.type(screen.getByLabelText("Confirm password"), "Abcdef12");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByTestId("register-error")).toHaveTextContent("Username already taken");
   });
@@ -64,12 +64,17 @@ describe("RegisterPage", () => {
     mockRegisterUser.mockRejectedValue(new Error("Network error"));
     const user = userEvent.setup();
     render(<RegisterPage />);
-    await user.type(screen.getByPlaceholderText("Username"), "alice");
-    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
-    await user.type(screen.getByPlaceholderText("Confirm password"), "Abcdef12");
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.type(screen.getByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "Abcdef12");
+    await user.type(screen.getByLabelText("Confirm password"), "Abcdef12");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByTestId("register-error")).toBeInTheDocument();
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("links to the login page", () => {
+    render(<RegisterPage />);
+    expect(screen.getByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
   });
 });
