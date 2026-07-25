@@ -32,6 +32,15 @@ pub mod game_token_wallet {
     ) -> Result<()> {
         instructions::user::create_user::handler(ctx, username, salt, password_hash)
     }
+
+    pub fn create_game(
+        ctx: Context<CreateGame>,
+        game_id: [u8; 16],
+        name: String,
+        username: String,
+    ) -> Result<()> {
+        instructions::game::create_game::handler(ctx, game_id, name, username)
+    }
 }
 
 #[derive(Accounts)]
