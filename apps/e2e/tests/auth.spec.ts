@@ -10,10 +10,10 @@ test.describe("registration and login", () => {
     const password = "Abcdef123!";
 
     await page.goto("/register");
-    await page.getByPlaceholder("Username").fill(username);
-    await page.getByPlaceholder("Password", { exact: true }).fill(password);
-    await page.getByPlaceholder("Confirm password").fill(password);
-    await page.getByRole("button", { name: "Register" }).click();
+    await page.getByLabel("Username").fill(username);
+    await page.getByLabel("Password", { exact: true }).fill(password);
+    await page.getByLabel("Confirm password").fill(password);
+    await page.getByRole("button", { name: "Create account" }).click();
 
     await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
     await expect(page.getByTestId("home-welcome")).toContainText(username);
@@ -24,8 +24,8 @@ test.describe("registration and login", () => {
     await page.goto("/home");
     await expect(page).toHaveURL(/\/login$/);
 
-    await page.getByPlaceholder("Username").fill(username);
-    await page.getByPlaceholder("Password").fill(password);
+    await page.getByLabel("Username").fill(username);
+    await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Log in" }).click();
 
     await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
@@ -37,19 +37,28 @@ test.describe("registration and login", () => {
     const password = "Abcdef123!";
 
     await page.goto("/register");
-    await page.getByPlaceholder("Username").fill(username);
-    await page.getByPlaceholder("Password", { exact: true }).fill(password);
-    await page.getByPlaceholder("Confirm password").fill(password);
-    await page.getByRole("button", { name: "Register" }).click();
+    await page.getByLabel("Username").fill(username);
+    await page.getByLabel("Password", { exact: true }).fill(password);
+    await page.getByLabel("Confirm password").fill(password);
+    await page.getByRole("button", { name: "Create account" }).click();
     await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
 
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/login$/);
 
-    await page.getByPlaceholder("Username").fill(username);
-    await page.getByPlaceholder("Password").fill("wrong-password");
+    await page.getByLabel("Username").fill(username);
+    await page.getByLabel("Password").fill("wrong-password");
     await page.getByRole("button", { name: "Log in" }).click();
 
     await expect(page.getByTestId("login-error")).toHaveText("Invalid username or password");
+  });
+
+  test("navigates between login and register via the footer links", async ({ page }) => {
+    await page.goto("/login");
+    await page.getByRole("link", { name: "Create an account" }).click();
+    await expect(page).toHaveURL(/\/register$/);
+
+    await page.getByRole("link", { name: "Log in" }).click();
+    await expect(page).toHaveURL(/\/login$/);
   });
 });
