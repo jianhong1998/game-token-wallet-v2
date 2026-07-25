@@ -20,15 +20,20 @@ Refer to tech stack written in [003-TECH-STACK.md](./docs/technical-related/arch
 
 Refer to codebase structure written in [001-CODEBASE-STRUCTURE.md](./docs/technical-related/codebase-structure/001-CODEBASE-STRUCTURE.md)
 
-## Build & Verify
+## Commands
 
-To be filled up when available.
+- Lint: `just lint`
+- Test: `just test`
+- Start: `just up` (first run: `just up-build`)
+- Clean up data: `just down-clean`
 
-```sh
+TDD is expected: new code ships with tests for the happy path and 2+ edge cases (see Done Means). These are the full-suite gate commands (used by the implementation pipeline below and before claiming a task done) — individual plan tasks specify narrower, faster commands for their own step-by-step TDD loop (e.g. `cargo test --manifest-path apps/on-chain-program/Cargo.toml`, `pnpm --filter frontend run test -- <pattern>`); use those while iterating, not the full suite after every step.
 
-```
+## Planning & Implementation Workflow
 
-TDD is expected: new code ships with tests for the happy path and 2+ edge cases (see Done Means).
+New feature/ticket work follows a three-layer planning pipeline (design → plan → openspec tracking) before implementation via `/autonomous-development-plugin:autonomous-feature-development`. Full workflow, artifact locations, and `plan_path`/`spec_path` wiring:
+
+@docs/technical-related/development-workflow/001-planning-and-implementation-workflow.md
 
 ## Critical Rules
 
