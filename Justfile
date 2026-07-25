@@ -63,13 +63,30 @@ deploy-program-local:
 
 [group: 'CI']
 test:
-  @cargo test --manifest-path apps/on-chain-program/Cargo.toml
-  @pnpm --filter frontend run test
-  @pnpm --filter on-chain-client run test
-  @cd apps/on-chain-program && anchor test
+  @just test-program-unit test-ui test-on-chain-client test-e2e-program
   @docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from on-chain-program-e2e surfpool program-deploy on-chain-program-e2e
   @docker compose -f docker-compose.e2e.yml down
   @docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e surfpool program-deploy frontend e2e
+
+[group: 'Test']
+test-ui:
+  @pnpm --filter frontend run test
+
+[group: 'Test']
+test-program-unit:
+  @cargo test --manifest-path apps/on-chain-program/Cargo.toml
+
+[group: 'Test']
+test-on-chain-client:
+  @pnpm --filter on-chain-client run test
+
+[group: 'Test']
+test-e2e-program:
+  @cd apps/on-chain-program && anchor test --skip-local-validator --provider.wallet ../../docker/local/fixtures/deployer-keypair.dev.json
+
+[group: 'Test']
+test-e2e:
+  @pnpm --filter e2e run test
 
 
 [group: 'On-Chain Program']

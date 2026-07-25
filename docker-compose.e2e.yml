@@ -92,6 +92,7 @@ services:
       # (see the README alongside it) and docker-compose.yml's PROGRAM_ID.
       PROGRAM_ID: "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t"
       SYSTEM_ADMIN_SECRET_KEY: "PzfkD238UH1WRMoQZpt9uJpJda2eLJYtv7Bi7qscpjWH3E1Fjm2odmcSu1XDz1FTz2yZfBWfYBYU4arQzFNNmis"
+      SESSION_SECRET: "e2e-test-session-secret-do-not-use-elsewhere"
     # Not in the plan's original compose text — added because `e2e` would
     # otherwise race `next start`'s boot time (no webServer wait built into
     # Playwright's config here). The runner image (bookworm-slim) has no

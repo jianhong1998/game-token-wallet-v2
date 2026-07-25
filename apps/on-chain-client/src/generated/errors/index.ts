@@ -6,5 +6,4 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./registry";
-export * from "./user";
+export * from "./gameTokenWallet";
