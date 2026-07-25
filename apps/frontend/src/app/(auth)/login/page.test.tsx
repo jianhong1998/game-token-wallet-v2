@@ -19,8 +19,8 @@ describe("LoginPage", () => {
     mockLoginUser.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
     render(<LoginPage />);
-    await user.type(screen.getByPlaceholderText("Username"), "alice");
-    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
+    await user.type(screen.getByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "Abcdef12");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/home"));
@@ -31,8 +31,8 @@ describe("LoginPage", () => {
     mockLoginUser.mockResolvedValue({ ok: false, error: "Invalid username or password" });
     const user = userEvent.setup();
     render(<LoginPage />);
-    await user.type(screen.getByPlaceholderText("Username"), "alice");
-    await user.type(screen.getByPlaceholderText("Password"), "wrong");
+    await user.type(screen.getByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "wrong");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(await screen.findByTestId("login-error")).toHaveTextContent("Invalid username or password");
@@ -42,11 +42,19 @@ describe("LoginPage", () => {
     mockLoginUser.mockRejectedValue(new Error("Network error"));
     const user = userEvent.setup();
     render(<LoginPage />);
-    await user.type(screen.getByPlaceholderText("Username"), "alice");
-    await user.type(screen.getByPlaceholderText("Password"), "Abcdef12");
+    await user.type(screen.getByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "Abcdef12");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(await screen.findByTestId("login-error")).toBeInTheDocument();
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("links to the register page", () => {
+    render(<LoginPage />);
+    expect(screen.getByRole("link", { name: "Create an account" })).toHaveAttribute(
+      "href",
+      "/register",
+    );
   });
 });
