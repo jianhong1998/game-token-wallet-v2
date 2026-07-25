@@ -1,0 +1,103 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+context: |
+  Game Token Wallet V2 — mobile-first Solana wallet dApp tokenizing offline
+  group games (poker, mahjong) as on-chain SPL tokens. Full narrative:
+  docs/technical-related/architecture/001-ARCHITECTURE.md (current state),
+  002-architecture-decisions.md (Q&A reasoning), 003-TECH-STACK.md.
+
+  Tech stack:
+  - Client: Next.js App Router, TypeScript, TanStack React Query (server
+    state), React Context (client state), Tailwind CSS v4, shadcn/ui
+    (Radix UI primitives) + class-variance-authority + clsx/tailwind-merge.
+    Mobile-first; desktop capped to mobile width with side margins.
+  - Server: Next.js Server Actions only — no Route Handlers (no app/api/*).
+    A single lazy singleton Connection/Program accessor is the only place
+    that talks to the chain; it holds the system admin wallet keypair and
+    signs every transaction server-side.
+  - On-chain: Rust, Anchor 1.x (via AVM, not 0.30.x), single program crate.
+    Local validator is Surfpool (solana-test-validator is deprecated here),
+    run via docker compose. Deployed network is devnet.
+  - No off-chain database anywhere — all persistent state (users, games,
+    balances) lives in on-chain accounts.
+  - Runtime env vars (no NEXT_PUBLIC_*, no build-time baking, no silent
+    fallback — missing/malformed throws): SYSTEM_ADMIN_SECRET_KEY
+    (base58 64-byte secret key), SOLANA_CLUSTER (localnet|devnet|mainnet-beta),
+    SOLANA_RPC_URL (always explicit, never inferred), PROGRAM_ID (read from
+    env, not the Anchor IDL's hardcoded address).
+
+  Architecture decisions (binding — see 002-architecture-decisions.md for
+  the "why" behind each):
+  - Custodial wallet model: password is never a signing secret. No client
+    ever holds/derives a keypair; every tx is signed server-side by the
+    deployment's system admin wallet.
+  - Single-tenant per deployment: one system admin wallet, one global
+    namespace of users/games. Multi-tenancy was dropped — a party wanting
+    isolation runs its own separate program deployment, not a shared one.
+  - Discovery via a singleton `Registry` PDA (seeds `["registry"]`) holding
+    a bounded list of open game IDs (capped at `MAX_ACTIVE_GAMES`) — one
+    deterministic fetch instead of a `getProgramAccounts` scan. User lookup
+    is a direct PDA derivation (`["user", username, system_admin_pubkey]`),
+    no registry entry needed.
+  - Three top-level account types: `Registry` (singleton discovery index),
+    `User` (one per username, stores hashed login password), `Game` (owns
+    its own SPL mint plus an embedded, ephemeral current-round/pot state
+    that resets in place each hand — no persistent per-hand history).
+  - One SPL token per game, **2 decimals** (not Solana's default 6/9).
+    Game membership is tracked implicitly via a player's per-game ATA
+    existence/balance — no separate on-chain membership list.
+  - Three game modes, same program, different instruction sets: General
+    (direct P2P transfer; multi-recipient is client-composed as N
+    single-recipient instructions, not a batched on-chain instruction),
+    Poker/Holdem (token/pot accounting only — no on-chain betting engine,
+    no turn order/hand ranking; primitives are `transfer` and `showhand`;
+    side pots derived mechanically from contributor/showhand event order;
+    admin declares winners per pot from that pot's contributor list),
+    General Pool (single continuous pool for the game's lifetime, no
+    rounds/showhand/eligibility checks, fully admin-discretionary payouts).
+  - Lifecycle rules: quitting mid-round forfeits pot contributions (no
+    refund); `close_game` burns all outstanding balances (wallets + pots)
+    then reclaims rent; admin transfer requires the new admin already be a
+    player, single admin only; `delete_user` is rejected while the user is
+    still an active player in any game (checked via client-supplied ATA list).
+
+  Codebase conventions (docs/technical-related/codebase-structure/):
+  - pnpm workspace, `apps/*` only — no `packages/*` (moved into apps; see
+    codebase-structure/002-decisions.md Q14 — don't recreate a packages/ split).
+  - `apps/frontend` (Next.js) — `src/server/` is the *only* place chain
+    access happens (Connection/Program singleton, signer, Server Actions);
+    route groups `(auth)` vs `(app)`; unit tests colocated
+    (`Component.test.tsx` next to `Component.tsx`).
+  - `apps/on-chain-program` (Anchor) — `state/` one file per account type,
+    `instructions/<mode>/` split (`user/`, `game/`, `general_mode/`,
+    `poker_mode/`, `pool_mode/`), single shared `errors.rs`. Rust unit tests
+    are inline `#[cfg(test)] mod tests` per file, run via plain `cargo test`.
+  - `apps/on-chain-program-e2e` (Anchor integration tests via `anchor test`)
+    and `apps/e2e` (Playwright) consume the generated
+    `apps/on-chain-client` (Anchor IDL + Codama TS client) — same client
+    the frontend uses, not a hand-rolled `Program` construction.
+  - `docker/local` = dev stack (Surfpool + dev image, root
+    `docker-compose.yml`); `docker/deployment` = production Dockerfile only,
+    no compose file; `docker-compose.e2e.yml` = separate prod-parity stack
+    CI boots before running `e2e`/`on-chain-program-e2e`.
+  - CircleCI runs lint, typecheck, `cargo test`, `on-chain-program-e2e`,
+    `e2e`, and frontend unit tests on **every** PR — one CI bar, no
+    fast-PR/slow-main split.
+
+  Still open / unconfirmed — do not treat as decided (see
+  docs/business-related/002-pending-discussion.md): deposit→mint conversion
+  rate, exact numeric caps (`MAX_ACTIVE_GAMES`, `MAX_POTS_PER_ROUND`,
+  per-tx multi-recipient chunk size — `MAX_PLAYER_PER_GAME` is fixed at 20
+  by the PRD), CI stage gating detail (every-PR vs. merge-to-main split).
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
