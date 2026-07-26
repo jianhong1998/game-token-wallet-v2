@@ -12,11 +12,20 @@ pub struct CreateGame<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
 
+    // Named `user` (not `creator_user`) to match `create_user`'s own account
+    // field of the same name: both instructions derive this PDA with
+    // identical seeds (`[b"user", username, admin]`), and Codama's IDL-driven
+    // client generator canonicalizes identically-seeded PDA accounts across
+    // instructions into a single named finder — using a different field name
+    // here would make it arbitrary (and, in one observed case, alphabetical
+    // IDL instruction ordering picked `creator_user`, silently deleting the
+    // `findUserPda`/`UserSeeds` exports that already-shipped frontend code
+    // (`server/actions/auth.ts`) imports by name).
     #[account(
         seeds = [b"user", username.as_bytes(), admin.key().as_ref()],
         bump,
     )]
-    pub creator_user: Account<'info, User>,
+    pub user: Account<'info, User>,
 
     #[account(mut, seeds = [b"registry"], bump)]
     pub registry: Account<'info, Registry>,
@@ -76,7 +85,7 @@ pub fn handler(
     game.game_id = game_id;
     game.name = name;
     game.mode = GameMode::General;
-    game.admin = ctx.accounts.creator_user.key();
+    game.admin = ctx.accounts.user.key();
     game.mint = ctx.accounts.mint.key();
     let game_key = game.key();
 
