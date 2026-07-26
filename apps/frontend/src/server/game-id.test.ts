@@ -32,7 +32,9 @@ describe("generateGameId", () => {
   });
 
   it("generates unique ids across many calls", () => {
-    const ids = new Set(Array.from({ length: 1000 }, () => Buffer.from(generateGameId()).toString("hex")));
+    const ids = new Set(
+      Array.from({ length: 1000 }, () => Buffer.from(generateGameId()).toString("hex")),
+    );
     expect(ids.size).toBe(1000);
   });
 });

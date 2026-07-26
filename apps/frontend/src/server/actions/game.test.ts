@@ -108,7 +108,12 @@ describe("createGame", () => {
   it("creates the game and sends the transaction on success", async () => {
     await expect(createGame({ name: "Friday Poker" })).resolves.toEqual({ ok: true });
     expect(mockGetCreateGameInstructionAsync).toHaveBeenCalledWith(
-      { admin: { address: ADMIN_ADDRESS }, username: "alice", gameId: GAME_ID_BYTES, name: "Friday Poker" },
+      {
+        admin: { address: ADMIN_ADDRESS },
+        username: "alice",
+        gameId: GAME_ID_BYTES,
+        name: "Friday Poker",
+      },
       { programAddress: PROGRAM_ADDRESS },
     );
     expect(mockSendAndConfirmTransaction).toHaveBeenCalledTimes(1);

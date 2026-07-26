@@ -31,7 +31,10 @@ export default async function GamesPage() {
       ) : (
         <ul className="flex flex-col gap-3" data-testid="games-list">
           {games.map((game) => (
-            <li key={game.address} className="glass-row flex items-center justify-between px-4 py-3">
+            <li
+              key={game.address}
+              className="glass-row flex items-center justify-between px-4 py-3"
+            >
               <span className="text-sm font-bold text-text-primary">{game.name}</span>
               <span className="text-xs font-semibold text-cyan-accent">Admin</span>
             </li>

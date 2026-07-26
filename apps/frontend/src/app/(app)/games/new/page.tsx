@@ -39,7 +39,10 @@ export default function NewGamePage() {
       <p className="text-sm font-semibold text-text-secondary">General Mode</p>
       <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3.5">
         <div>
-          <label htmlFor="game-name" className="mb-1.5 block text-[11px] font-bold text-text-primary">
+          <label
+            htmlFor="game-name"
+            className="mb-1.5 block text-[11px] font-bold text-text-primary"
+          >
             Game name
           </label>
           <Input

@@ -74,7 +74,10 @@ export async function listMyGames(): Promise<MyGame[]> {
   if (!username) return [];
 
   const { rpc, adminSigner, programAddress } = await getSolanaContext();
-  const [userAddress] = await findUserPda({ username, admin: adminSigner.address }, { programAddress });
+  const [userAddress] = await findUserPda(
+    { username, admin: adminSigner.address },
+    { programAddress },
+  );
   const [registryAddress] = await findRegistryPda({ programAddress });
   const registry = await fetchMaybeRegistry(rpc, registryAddress);
   if (!registry.exists) return [];
