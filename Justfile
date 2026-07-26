@@ -88,6 +88,10 @@ test-e2e-program:
 test-e2e:
   @pnpm --filter e2e run test
 
+[group: 'Test']
+test-e2e-with-browser:
+  @pnpm --filter e2e run test --ui
+
 
 [group: 'On-Chain Program']
 program-build:

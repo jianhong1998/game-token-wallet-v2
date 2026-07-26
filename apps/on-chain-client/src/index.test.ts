@@ -9,6 +9,12 @@ import {
   findUserPda,
   fetchMaybeUser,
   GAME_TOKEN_WALLET_ERROR__INVALID_USERNAME_LENGTH,
+  findGamePda,
+  fetchGame,
+  getCreateGameInstructionAsync,
+  GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH,
+  GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS,
+  GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL,
   isGameTokenWalletError,
 } from "./index";
 
@@ -34,5 +40,14 @@ describe("generated on-chain-client", () => {
     expect(typeof getCreateUserInstructionAsync).toBe("function");
     expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_USERNAME_LENGTH).toBe("number");
     expect(typeof isGameTokenWalletError).toBe("function");
+  });
+
+  it("exports a game PDA finder, account fetcher, create instruction builder, and error helpers", () => {
+    expect(typeof findGamePda).toBe("function");
+    expect(typeof fetchGame).toBe("function");
+    expect(typeof getCreateGameInstructionAsync).toBe("function");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH).toBe("number");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS).toBe("number");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL).toBe("number");
   });
 });

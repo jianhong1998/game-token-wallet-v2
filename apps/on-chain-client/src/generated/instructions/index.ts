@@ -6,6 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./createGame";
 export * from "./createUser";
 export * from "./initializeRegistry";
 export * from "./noop";

@@ -6,5 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./game";
+export * from "./mint";
 export * from "./registry";
 export * from "./user";

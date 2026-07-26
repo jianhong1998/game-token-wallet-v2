@@ -17,9 +17,11 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
+  parseCreateGameInstruction,
   parseCreateUserInstruction,
   parseInitializeRegistryInstruction,
   parseNoopInstruction,
+  type ParsedCreateGameInstruction,
   type ParsedCreateUserInstruction,
   type ParsedInitializeRegistryInstruction,
   type ParsedNoopInstruction,
@@ -29,6 +31,7 @@ export const GAME_TOKEN_WALLET_PROGRAM_ADDRESS =
   "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t" as Address<"FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t">;
 
 export enum GameTokenWalletAccount {
+  Game,
   Registry,
   User,
 }
@@ -37,6 +40,17 @@ export function identifyGameTokenWalletAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): GameTokenWalletAccount {
   const data = "data" in account ? account.data : account;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([27, 90, 166, 125, 74, 100, 121, 18]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletAccount.Game;
+  }
   if (
     containsBytes(
       data,
@@ -65,6 +79,7 @@ export function identifyGameTokenWalletAccount(
 }
 
 export enum GameTokenWalletInstruction {
+  CreateGame,
   CreateUser,
   InitializeRegistry,
   Noop,
@@ -74,6 +89,17 @@ export function identifyGameTokenWalletInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): GameTokenWalletInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([124, 69, 75, 66, 184, 220, 72, 206]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.CreateGame;
+  }
   if (
     containsBytes(
       data,
@@ -116,6 +142,9 @@ export type ParsedGameTokenWalletInstruction<
   TProgram extends string = "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t",
 > =
   | ({
+      instructionType: GameTokenWalletInstruction.CreateGame;
+    } & ParsedCreateGameInstruction<TProgram>)
+  | ({
       instructionType: GameTokenWalletInstruction.CreateUser;
     } & ParsedCreateUserInstruction<TProgram>)
   | ({
@@ -130,6 +159,13 @@ export function parseGameTokenWalletInstruction<TProgram extends string>(
 ): ParsedGameTokenWalletInstruction<TProgram> {
   const instructionType = identifyGameTokenWalletInstruction(instruction);
   switch (instructionType) {
+    case GameTokenWalletInstruction.CreateGame: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.CreateGame,
+        ...parseCreateGameInstruction(instruction),
+      };
+    }
     case GameTokenWalletInstruction.CreateUser: {
       assertIsInstructionWithAccounts(instruction);
       return {
