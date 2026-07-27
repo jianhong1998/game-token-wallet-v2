@@ -30,6 +30,9 @@ touches one of those areas.
 | 015 | Poker Mode: side pots                     | 014, 013   | Pending |
 | 016 | General Pool Mode                         | 008, 013   | Pending |
 | 017 | Frontend design foundation                | 001        | Done    |
+| 018 | Home dashboard, nav, and account screen   | 005, 006, 019 | Pending |
+| 019 | Remove no-op scaffolding; relocate dashboard to `/` | 001, 003 | Pending |
+| 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Pending |
 
 ## Dependency diagram
 
@@ -52,6 +55,9 @@ graph TD
     014["014 Poker Mode: single pot"]
     015["015 Poker Mode: side pots"]
     016["016 General Pool Mode"]
+    018["018 Home dashboard, nav, and account screen"]
+    019["019 Remove no-op scaffolding; relocate dashboard to /"]
+    020["020 Redirect authenticated users off login/register; migrate to proxy.ts"]
 
     001 --> 002
     001 --> 017
@@ -78,4 +84,12 @@ graph TD
     013 --> 015
     008 --> 016
     013 --> 016
+    005 --> 018
+    006 --> 018
+    001 --> 019
+    003 --> 019
+    019 --> 018
+    001 --> 020
+    003 --> 020
+    019 --> 020
 ```
