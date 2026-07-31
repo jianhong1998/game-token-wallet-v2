@@ -11,25 +11,28 @@ CI stage gating, deposit conversion rate, etc.) are tracked in
 [002-pending-discussion.md](../business-related/002-pending-discussion.md) — check it before implementing a ticket that
 touches one of those areas.
 
-| #   | Title                                     | Blocked by | Status  |
-| --- | ----------------------------------------- | ---------- | ------- |
-| 001 | Repo bootstrap & connection utility       | None       | Done    |
-| 002 | Registry account + init                   | 001        | Done    |
-| 003 | User registration & login                 | 001, 017   | Pending |
-| 004 | Devnet deploy pipeline + Docker self-host | 001, 003   | Pending |
-| 005 | Create game (General Mode, public)        | 002, 003   | Pending |
-| 006 | Join game (public)                        | 005        | Pending |
-| 007 | Private games (password-protected)        | 005, 006   | Pending |
-| 008 | Deposit / mint to player                  | 006        | Pending |
-| 009 | General Mode transfers                    | 008        | Pending |
-| 010 | Game admin transfer                       | 006        | Pending |
-| 011 | Quit game                                 | 009        | Pending |
-| 012 | Delete user account                       | 003, 011   | Pending |
-| 013 | Close game (General Mode)                 | 002, 009   | Pending |
-| 014 | Poker Mode: single pot                    | 006, 008   | Pending |
-| 015 | Poker Mode: side pots                     | 014, 013   | Pending |
-| 016 | General Pool Mode                         | 008, 013   | Pending |
-| 017 | Frontend design foundation                | 001        | Done    |
+| #   | Title                                                                                     | Blocked by    | Status  |
+| --- | ----------------------------------------------------------------------------------------- | ------------- | ------- |
+| 001 | Repo bootstrap & connection utility                                                       | None          | Done    |
+| 002 | Registry account + init                                                                   | 001           | Done    |
+| 003 | User registration & login                                                                 | 001, 017      | Done    |
+| 004 | Devnet deploy pipeline + Docker self-host                                                 | 001, 003      | Pending |
+| 005 | Create game (General Mode, public)                                                        | 002, 003      | Pending |
+| 006 | Join game (public)                                                                        | 005           | Pending |
+| 007 | Private games (password-protected)                                                        | 005, 006      | Pending |
+| 008 | Deposit / mint to player                                                                  | 006           | Pending |
+| 009 | General Mode transfers                                                                    | 008           | Pending |
+| 010 | Game admin transfer                                                                       | 006           | Pending |
+| 011 | Quit game                                                                                 | 009           | Pending |
+| 012 | Delete user account                                                                       | 003, 011      | Pending |
+| 013 | Close game (General Mode)                                                                 | 002, 009      | Pending |
+| 014 | Poker Mode: single pot                                                                    | 006, 008      | Pending |
+| 015 | Poker Mode: side pots                                                                     | 014, 013      | Pending |
+| 016 | General Pool Mode                                                                         | 008, 013      | Pending |
+| 017 | Frontend design foundation                                                                | 001           | Done    |
+| 018 | Home dashboard, nav, and account screen                                                   | 005, 006, 019 | Pending |
+| 019 | Remove no-op scaffolding; relocate dashboard to `/`                                       | 001, 003      | Pending |
+| 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Pending |
 
 ## Dependency diagram
 
@@ -52,6 +55,9 @@ graph TD
     014["014 Poker Mode: single pot"]
     015["015 Poker Mode: side pots"]
     016["016 General Pool Mode"]
+    018["018 Home dashboard, nav, and account screen"]
+    019["019 Remove no-op scaffolding; relocate dashboard to /"]
+    020["020 Redirect authenticated users off login/register; migrate to proxy.ts"]
 
     001 --> 002
     001 --> 017
@@ -78,4 +84,12 @@ graph TD
     013 --> 015
     008 --> 016
     013 --> 016
+    005 --> 018
+    006 --> 018
+    001 --> 019
+    003 --> 019
+    019 --> 018
+    001 --> 020
+    003 --> 020
+    019 --> 020
 ```
