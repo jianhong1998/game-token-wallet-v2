@@ -25,12 +25,21 @@ commands:
           command: echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
 
 jobs:
+  # `sudo` on the corepack line is required, not stylistic: on the amd64
+  # build of cimg/node:24.18 (what CircleCI's cloud docker executor actually
+  # runs — confirmed via `docker run --platform linux/amd64`; the arm64
+  # build, e.g. on Apple Silicon, does not hit this), /usr/local/bin is
+  # owned by `ubuntu`, not the `circleci` user the job runs as. `circleci`
+  # has no write permission on that directory, so `corepack enable` fails
+  # unlinking the pre-baked pnpm/yarn shims with EACCES regardless of who
+  # owns those individual files. Passwordless sudo is available for
+  # `circleci` on this image, which is corepack's documented workaround.
   lint:
     docker:
       - image: cimg/node:24.18
     steps:
       - checkout
-      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: sudo corepack enable && sudo corepack prepare pnpm@11.15.1 --activate
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
 
@@ -39,7 +48,7 @@ jobs:
       - image: cimg/node:24.18
     steps:
       - checkout
-      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: sudo corepack enable && sudo corepack prepare pnpm@11.15.1 --activate
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
 
@@ -48,7 +57,7 @@ jobs:
       - image: cimg/node:24.18
     steps:
       - checkout
-      - run: corepack enable && corepack prepare pnpm@11.15.1 --activate
+      - run: sudo corepack enable && sudo corepack prepare pnpm@11.15.1 --activate
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter frontend run test
       - run: pnpm --filter on-chain-client run test
