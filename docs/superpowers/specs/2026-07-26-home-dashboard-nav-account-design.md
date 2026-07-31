@@ -4,6 +4,8 @@ Spec for [docs/tickets/018-home-dashboard-nav-account.md](../../tickets/018-home
 
 **Note (amended after ticket 019 was scoped):** this design originally targeted `/home` as the dashboard route. Ticket 019 relocates the app's root (`/`) from a leftover connectivity demo to the dashboard, so every `/home` reference below now means `/`. Amending here rather than building at `/home` and moving it, since nothing in this design had been implemented yet.
 
+**OpenSpec tracking:** [openspec/changes/home-dashboard-nav-account/](../../../openspec/changes/home-dashboard-nav-account/) (`proposal.md`, `design.md`, `specs/home-dashboard/spec.md`, `tasks.md`) — the file-by-file task breakdown for implementation lives there.
+
 ---
 
 ## Grill session — decisions

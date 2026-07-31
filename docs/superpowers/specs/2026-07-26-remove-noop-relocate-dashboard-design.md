@@ -2,6 +2,8 @@
 
 Spec for [docs/tickets/019-remove-noop-relocate-dashboard.md](../../tickets/019-remove-noop-relocate-dashboard.md). Blocked by 001 (repo bootstrap, done) and 003 (login, done). Triggered by the same UI-design-vs-shipped-tickets audit that produced ticket 018: `apps/frontend/src/app/page.tsx` at `/` is ticket 001's leftover connectivity smoke test (a "Send noop transaction" button calling the on-chain program's `noop` instruction), never replaced with real app content, while the real authenticated placeholder lives at `/home` instead of the app's root.
 
+**OpenSpec tracking:** [openspec/changes/remove-noop-relocate-dashboard/](../../../openspec/changes/remove-noop-relocate-dashboard/) (`proposal.md`, `design.md`, `specs/app-shell/spec.md`, `tasks.md`) — the file-by-file task breakdown for implementation lives there.
+
 ---
 
 ## Grill session — decisions

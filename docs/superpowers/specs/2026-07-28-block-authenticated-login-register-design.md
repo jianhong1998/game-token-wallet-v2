@@ -2,6 +2,8 @@
 
 Spec for [docs/tickets/020-block-authenticated-login-register.md](../../tickets/020-block-authenticated-login-register.md). Blocked by 001 (done), 003 (done), 019 (pending — supplies the `/` redirect target). Triggered by two independent observations while reviewing `apps/frontend/src/middleware.ts`: (1) it only gates the logged-out direction — an authenticated user can still open `/login` or `/register` freely; (2) Next.js 16.2.10's dev server logs `The "middleware" file convention is deprecated. Please use "proxy" instead.`
 
+**OpenSpec tracking:** [openspec/changes/block-authenticated-login-register/](../../../openspec/changes/block-authenticated-login-register/) (`proposal.md`, `design.md`, `specs/app-shell/spec.md`, `tasks.md`) — the file-by-file task breakdown for implementation lives there.
+
 ---
 
 ## Grill session — decisions
