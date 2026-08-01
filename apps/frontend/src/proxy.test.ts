@@ -73,4 +73,40 @@ describe("proxy", () => {
     const response = await proxy(request);
     expect(response.headers.get("location")).toBeNull();
   });
+
+  it("redirects an authenticated visitor away from /login to /", async () => {
+    mockVerifySessionCookie.mockResolvedValue({ username: "alice" });
+    const request = new NextRequest("http://localhost/login", {
+      headers: { cookie: "session=good-value" },
+    });
+    const response = await proxy(request);
+    expect(response.headers.get("location")).toBe("http://localhost/");
+  });
+
+  it("redirects an authenticated visitor away from /register to /", async () => {
+    mockVerifySessionCookie.mockResolvedValue({ username: "alice" });
+    const request = new NextRequest("http://localhost/register", {
+      headers: { cookie: "session=good-value" },
+    });
+    const response = await proxy(request);
+    expect(response.headers.get("location")).toBe("http://localhost/");
+  });
+
+  it("allows /login through when the session cookie is invalid", async () => {
+    mockVerifySessionCookie.mockResolvedValue(null);
+    const request = new NextRequest("http://localhost/login", {
+      headers: { cookie: "session=bad-value" },
+    });
+    const response = await proxy(request);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("allows /register through when the session cookie is invalid", async () => {
+    mockVerifySessionCookie.mockResolvedValue(null);
+    const request = new NextRequest("http://localhost/register", {
+      headers: { cookie: "session=bad-value" },
+    });
+    const response = await proxy(request);
+    expect(response.headers.get("location")).toBeNull();
+  });
 });
