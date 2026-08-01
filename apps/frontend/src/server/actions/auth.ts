@@ -7,15 +7,13 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
-  signTransactionMessageWithSigners,
-  sendAndConfirmTransactionFactory,
-  assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
 import { findUserPda, fetchMaybeUser, getCreateUserInstructionAsync } from "on-chain-client";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { validatePassword } from "@/lib/password-rules";
 import { getSolanaContext } from "../connection";
 import { hashPassword, verifyPassword, runDummyHash } from "../password";
+import { signAndSendTransaction } from "../transaction";
 import {
   createSessionCookie,
   verifySessionCookie,
@@ -96,16 +94,15 @@ export async function registerUser(input: RegisterUserInput): Promise<AuthAction
     (tx) => appendTransactionMessageInstructions([createUserInstruction], tx),
   );
 
-  const signedTransaction = await signTransactionMessageWithSigners(transactionMessage);
-  assertIsTransactionWithBlockhashLifetime(signedTransaction);
-  const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions });
-
   try {
-    await sendAndConfirmTransaction(signedTransaction, { commitment: "confirmed" });
+    // signAndSendTransaction bundles sign, blockhash-lifetime assertion, and
+    // send/confirm, so any of those steps can land us here — but in practice
+    // this fires for the duplicate-username case, which fails Anchor's
+    // `init` constraint on send. Rather than string-matching the error,
+    // re-check whether the account now exists (same idempotency-check
+    // pattern as registry.ts's initializeRegistry).
+    await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
   } catch (error) {
-    // The duplicate-username case fails Anchor's `init` constraint — rather
-    // than string-matching the error, re-check whether the account now
-    // exists (same idempotency-check pattern as registry.ts's initializeRegistry).
     const [userAddress] = await findUserPda(
       { username: normalizedUsername, admin: adminSigner.address },
       { programAddress },

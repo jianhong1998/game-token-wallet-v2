@@ -6,9 +6,6 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
-  signTransactionMessageWithSigners,
-  sendAndConfirmTransactionFactory,
-  assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
 import {
   findUserPda,
@@ -20,6 +17,7 @@ import {
 import { normalizeGameName, validateGameName } from "@/lib/game-name";
 import { getSolanaContext } from "../connection";
 import { generateGameId } from "../game-id";
+import { signAndSendTransaction } from "../transaction";
 import { getCurrentUsername } from "./auth";
 
 export interface CreateGameInput {
@@ -56,10 +54,7 @@ export async function createGame(input: CreateGameInput): Promise<CreateGameResu
     (tx) => appendTransactionMessageInstructions([createGameInstruction], tx),
   );
 
-  const signedTransaction = await signTransactionMessageWithSigners(transactionMessage);
-  assertIsTransactionWithBlockhashLifetime(signedTransaction);
-  const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions });
-  await sendAndConfirmTransaction(signedTransaction, { commitment: "confirmed" });
+  await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
 
   return { ok: true };
 }

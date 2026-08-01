@@ -31,7 +31,7 @@ touches one of those areas.
 | 016 | General Pool Mode                                                                         | 008, 013      | Pending |
 | 017 | Frontend design foundation                                                                | 001           | Done    |
 | 018 | Home dashboard, nav, and account screen                                                   | 005, 006, 019 | Pending |
-| 019 | Remove no-op scaffolding; relocate dashboard to `/`                                       | 001, 003      | Pending |
+| 019 | Remove no-op scaffolding; relocate dashboard to `/`                                       | 001, 003      | Done    |
 | 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Pending |
 
 ## Dependency diagram

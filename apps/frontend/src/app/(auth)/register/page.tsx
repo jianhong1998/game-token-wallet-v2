@@ -29,7 +29,7 @@ export default function RegisterPage() {
       try {
         const result = await registerUser({ username, password, confirmPassword });
         if (result.ok) {
-          router.push("/home");
+          router.push("/");
         } else {
           setError(result.error);
         }

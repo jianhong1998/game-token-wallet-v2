@@ -15,7 +15,7 @@ describe("LoginPage", () => {
     vi.clearAllMocks();
   });
 
-  it("submits and redirects to /home on success", async () => {
+  it("submits and redirects to / on success", async () => {
     mockLoginUser.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
     render(<LoginPage />);
@@ -23,7 +23,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText("Password"), "Abcdef12");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/home"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
     expect(mockLoginUser).toHaveBeenCalledWith({ username: "alice", password: "Abcdef12" });
   });
 

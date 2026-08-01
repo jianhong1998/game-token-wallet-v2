@@ -22,7 +22,7 @@ export default function LoginPage() {
       try {
         const result = await loginUser({ username, password });
         if (result.ok) {
-          router.push("/home");
+          router.push("/");
         } else {
           setError(result.error);
         }
