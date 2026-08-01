@@ -11,8 +11,17 @@ describe("middleware", () => {
     vi.clearAllMocks();
   });
 
-  it("allows the root noop demo page through without a session", async () => {
+  it("redirects to /login for an unauthenticated visitor to the root dashboard", async () => {
     const request = new NextRequest("http://localhost/");
+    const response = await middleware(request);
+    expect(response.headers.get("location")).toBe("http://localhost/login");
+  });
+
+  it("allows the root dashboard through with a valid session cookie", async () => {
+    mockVerifySessionCookie.mockResolvedValue({ username: "alice" });
+    const request = new NextRequest("http://localhost/", {
+      headers: { cookie: "session=good-value" },
+    });
     const response = await middleware(request);
     expect(response.headers.get("location")).toBeNull();
   });
