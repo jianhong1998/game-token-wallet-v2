@@ -5,7 +5,7 @@ function uniqueUsername(): string {
 }
 
 test.describe("registration and login", () => {
-  test("a new user can register, land on /home, log out, and log back in", async ({ page }) => {
+  test("a new user can register, land on /, log out, and log back in", async ({ page }) => {
     const username = uniqueUsername();
     const password = "Abcdef123!";
 
@@ -15,20 +15,20 @@ test.describe("registration and login", () => {
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create account" }).click();
 
-    await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
     await expect(page.getByTestId("home-welcome")).toContainText(username);
 
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/login$/);
 
-    await page.goto("/home");
+    await page.goto("/");
     await expect(page).toHaveURL(/\/login$/);
 
     await page.getByLabel("Username").fill(username);
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Log in" }).click();
 
-    await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
     await expect(page.getByTestId("home-welcome")).toContainText(username);
   });
 
@@ -41,7 +41,7 @@ test.describe("registration and login", () => {
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
 
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/login$/);

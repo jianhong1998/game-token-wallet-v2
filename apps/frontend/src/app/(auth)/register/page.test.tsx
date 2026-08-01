@@ -31,7 +31,7 @@ describe("RegisterPage", () => {
     expect(await screen.findByTestId("confirm-password-hint")).toBeInTheDocument();
   });
 
-  it("submits and redirects to /home on success", async () => {
+  it("submits and redirects to / on success", async () => {
     mockRegisterUser.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
     render(<RegisterPage />);
@@ -40,7 +40,7 @@ describe("RegisterPage", () => {
     await user.type(screen.getByLabelText("Confirm password"), "Abcdef12");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/home"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
     expect(mockRegisterUser).toHaveBeenCalledWith({
       username: "alice",
       password: "Abcdef12",

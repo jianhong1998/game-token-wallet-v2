@@ -14,7 +14,7 @@ test.describe("game creation", () => {
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
 
     await page.goto("/games");
     await expect(page.getByTestId("games-empty")).toBeVisible();
@@ -39,7 +39,7 @@ test.describe("game creation", () => {
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
 
     await page.goto("/games/new");
     await page.getByLabel("Game name").fill("ab");
