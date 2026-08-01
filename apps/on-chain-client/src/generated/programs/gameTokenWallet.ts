@@ -20,11 +20,9 @@ import {
   parseCreateGameInstruction,
   parseCreateUserInstruction,
   parseInitializeRegistryInstruction,
-  parseNoopInstruction,
   type ParsedCreateGameInstruction,
   type ParsedCreateUserInstruction,
   type ParsedInitializeRegistryInstruction,
-  type ParsedNoopInstruction,
 } from "../instructions";
 
 export const GAME_TOKEN_WALLET_PROGRAM_ADDRESS =
@@ -82,7 +80,6 @@ export enum GameTokenWalletInstruction {
   CreateGame,
   CreateUser,
   InitializeRegistry,
-  Noop,
 }
 
 export function identifyGameTokenWalletInstruction(
@@ -122,17 +119,6 @@ export function identifyGameTokenWalletInstruction(
   ) {
     return GameTokenWalletInstruction.InitializeRegistry;
   }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([9, 178, 13, 115, 129, 35, 237, 102]),
-      ),
-      0,
-    )
-  ) {
-    return GameTokenWalletInstruction.Noop;
-  }
   throw new Error(
     "The provided instruction could not be identified as a gameTokenWallet instruction.",
   );
@@ -149,10 +135,7 @@ export type ParsedGameTokenWalletInstruction<
     } & ParsedCreateUserInstruction<TProgram>)
   | ({
       instructionType: GameTokenWalletInstruction.InitializeRegistry;
-    } & ParsedInitializeRegistryInstruction<TProgram>)
-  | ({
-      instructionType: GameTokenWalletInstruction.Noop;
-    } & ParsedNoopInstruction<TProgram>);
+    } & ParsedInitializeRegistryInstruction<TProgram>);
 
 export function parseGameTokenWalletInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
@@ -178,12 +161,6 @@ export function parseGameTokenWalletInstruction<TProgram extends string>(
       return {
         instructionType: GameTokenWalletInstruction.InitializeRegistry,
         ...parseInitializeRegistryInstruction(instruction),
-      };
-    }
-    case GameTokenWalletInstruction.Noop: {
-      return {
-        instructionType: GameTokenWalletInstruction.Noop,
-        ...parseNoopInstruction(instruction),
       };
     }
     default:
