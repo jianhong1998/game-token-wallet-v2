@@ -95,11 +95,14 @@ export async function registerUser(input: RegisterUserInput): Promise<AuthAction
   );
 
   try {
+    // signAndSendTransaction bundles sign, blockhash-lifetime assertion, and
+    // send/confirm, so any of those steps can land us here — but in practice
+    // this fires for the duplicate-username case, which fails Anchor's
+    // `init` constraint on send. Rather than string-matching the error,
+    // re-check whether the account now exists (same idempotency-check
+    // pattern as registry.ts's initializeRegistry).
     await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
   } catch (error) {
-    // The duplicate-username case fails Anchor's `init` constraint — rather
-    // than string-matching the error, re-check whether the account now
-    // exists (same idempotency-check pattern as registry.ts's initializeRegistry).
     const [userAddress] = await findUserPda(
       { username: normalizedUsername, admin: adminSigner.address },
       { programAddress },

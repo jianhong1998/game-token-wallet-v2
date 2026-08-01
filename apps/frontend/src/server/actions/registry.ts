@@ -36,11 +36,14 @@ export async function initializeRegistry(): Promise<{ activeGameCount: number }>
   );
 
   try {
+    // signAndSendTransaction bundles sign, blockhash-lifetime assertion, and
+    // send/confirm, so any of those steps can land us here — but in practice
+    // this fires when a concurrent caller initialized the registry first
+    // between our read and our send. Re-check rather than surfacing a scary
+    // error for what is, from the caller's perspective, still a successful
+    // outcome.
     await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
   } catch (error) {
-    // Concurrent caller may have initialized it first between our read and
-    // our send — re-check rather than surfacing a scary error for what is,
-    // from the caller's perspective, still a successful outcome.
     const raced = await fetchMaybeRegistry(rpc, registryAddress);
     if (raced.exists) {
       return { activeGameCount: raced.data.activeGames.length };
