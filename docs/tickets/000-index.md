@@ -32,7 +32,7 @@ touches one of those areas.
 | 017 | Frontend design foundation                                                                | 001           | Done    |
 | 018 | Home dashboard, nav, and account screen                                                   | 005, 006, 019 | Pending |
 | 019 | Remove no-op scaffolding; relocate dashboard to `/`                                       | 001, 003      | Done    |
-| 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Pending |
+| 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Done    |
 
 ## Dependency diagram
 
@@ -92,4 +92,9 @@ graph TD
     001 --> 020
     003 --> 020
     019 --> 020
+
+    classDef done stroke:#2ecc71,stroke-width:3px;
+    classDef inProgress stroke:#f1c40f,stroke-width:3px;
+
+    class 001,002,003,017,019,020 done;
 ```
