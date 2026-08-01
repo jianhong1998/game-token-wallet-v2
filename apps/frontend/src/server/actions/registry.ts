@@ -6,12 +6,10 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
-  signTransactionMessageWithSigners,
-  sendAndConfirmTransactionFactory,
-  assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
 import { fetchMaybeRegistry, findRegistryPda, getInitializeRegistryInstructionAsync } from "on-chain-client";
 import { getSolanaContext } from "../connection";
+import { signAndSendTransaction } from "../transaction";
 
 export async function initializeRegistry(): Promise<{ activeGameCount: number }> {
   const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
@@ -37,13 +35,8 @@ export async function initializeRegistry(): Promise<{ activeGameCount: number }>
     (tx) => appendTransactionMessageInstructions([initializeInstruction], tx),
   );
 
-  const signedTransaction = await signTransactionMessageWithSigners(transactionMessage);
-  // See apps/frontend/src/server/actions/noop.ts for why this assertion is needed.
-  assertIsTransactionWithBlockhashLifetime(signedTransaction);
-  const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions });
-
   try {
-    await sendAndConfirmTransaction(signedTransaction, { commitment: "confirmed" });
+    await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
   } catch (error) {
     // Concurrent caller may have initialized it first between our read and
     // our send — re-check rather than surfacing a scary error for what is,

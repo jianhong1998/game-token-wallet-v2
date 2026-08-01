@@ -22,19 +22,10 @@ vi.mock("on-chain-client", () => ({
   getInitializeRegistryInstructionAsync: mockGetInitializeRegistryInstructionAsync,
 }));
 
-const { mockSignTransactionMessageWithSigners, mockSendAndConfirmTransaction } = vi.hoisted(() => ({
-  mockSignTransactionMessageWithSigners: vi.fn(),
-  mockSendAndConfirmTransaction: vi.fn(),
+const { mockSignAndSendTransaction } = vi.hoisted(() => ({
+  mockSignAndSendTransaction: vi.fn(),
 }));
-vi.mock("@solana/kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@solana/kit")>();
-  return {
-    ...actual,
-    signTransactionMessageWithSigners: mockSignTransactionMessageWithSigners,
-    assertIsTransactionWithBlockhashLifetime: vi.fn(),
-    sendAndConfirmTransactionFactory: () => mockSendAndConfirmTransaction,
-  };
-});
+vi.mock("../transaction", () => ({ signAndSendTransaction: mockSignAndSendTransaction }));
 
 import { initializeRegistry } from "./registry";
 
@@ -67,8 +58,7 @@ describe("initializeRegistry", () => {
       accounts: [],
       data: new Uint8Array(),
     });
-    mockSignTransactionMessageWithSigners.mockResolvedValue({});
-    mockSendAndConfirmTransaction.mockResolvedValue(undefined);
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
   });
 
   it("returns the existing active game count without sending a transaction when the registry already exists", async () => {
@@ -81,10 +71,10 @@ describe("initializeRegistry", () => {
     const result = await initializeRegistry();
 
     expect(result).toEqual({ activeGameCount: 1 });
-    expect(mockSendAndConfirmTransaction).not.toHaveBeenCalled();
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
     // Regression guard: the registry PDA must be derived against the
     // env-configured program address (getSolanaContext), never the
-    // codegen-baked default — see apps/frontend/src/server/actions/noop.ts.
+    // codegen-baked default.
     expect(mockFindRegistryPda).toHaveBeenCalledWith({
       programAddress: "Prog1111111111111111111111111111111111111",
     });
@@ -96,7 +86,7 @@ describe("initializeRegistry", () => {
     const result = await initializeRegistry();
 
     expect(result).toEqual({ activeGameCount: 0 });
-    expect(mockSendAndConfirmTransaction).toHaveBeenCalledTimes(1);
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
     // Regression guard: the registry account must be passed explicitly using
     // the PDA derived against the env-configured program address, never left
     // for the generated builder to re-derive against its codegen-baked
@@ -115,7 +105,7 @@ describe("initializeRegistry", () => {
         address: REGISTRY_ADDRESS,
         data: registryData([]),
       } as MaybeAccount<Registry>);
-    mockSendAndConfirmTransaction.mockRejectedValueOnce(new Error("already in use"));
+    mockSignAndSendTransaction.mockRejectedValueOnce(new Error("already in use"));
 
     const result = await initializeRegistry();
 
