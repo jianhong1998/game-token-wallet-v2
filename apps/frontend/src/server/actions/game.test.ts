@@ -32,19 +32,10 @@ vi.mock("on-chain-client", () => ({
   getCreateGameInstructionAsync: mockGetCreateGameInstructionAsync,
 }));
 
-const { mockSignTransactionMessageWithSigners, mockSendAndConfirmTransaction } = vi.hoisted(() => ({
-  mockSignTransactionMessageWithSigners: vi.fn(),
-  mockSendAndConfirmTransaction: vi.fn(),
+const { mockSignAndSendTransaction } = vi.hoisted(() => ({
+  mockSignAndSendTransaction: vi.fn(),
 }));
-vi.mock("@solana/kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@solana/kit")>();
-  return {
-    ...actual,
-    signTransactionMessageWithSigners: mockSignTransactionMessageWithSigners,
-    assertIsTransactionWithBlockhashLifetime: vi.fn(),
-    sendAndConfirmTransactionFactory: () => mockSendAndConfirmTransaction,
-  };
-});
+vi.mock("../transaction", () => ({ signAndSendTransaction: mockSignAndSendTransaction }));
 
 import { createGame, listMyGames } from "./game";
 
@@ -88,8 +79,7 @@ describe("createGame", () => {
       accounts: [],
       data: new Uint8Array(),
     });
-    mockSignTransactionMessageWithSigners.mockResolvedValue({});
-    mockSendAndConfirmTransaction.mockResolvedValue(undefined);
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
   });
 
   it("rejects when not signed in, without touching the chain", async () => {
@@ -116,7 +106,7 @@ describe("createGame", () => {
       },
       { programAddress: PROGRAM_ADDRESS },
     );
-    expect(mockSendAndConfirmTransaction).toHaveBeenCalledTimes(1);
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
   });
 });
 
