@@ -30,7 +30,7 @@ function base64UrlDecode(value: string): Uint8Array<ArrayBuffer> {
 }
 
 // Uses Web Crypto (crypto.subtle), not node:crypto, so this module works
-// identically whether middleware.ts runs on the Edge or Node.js runtime.
+// identically whether proxy.ts runs on the Edge or Node.js runtime.
 async function getHmacKey(secret: string): Promise<CryptoKey> {
   return globalThis.crypto.subtle.importKey(
     "raw",

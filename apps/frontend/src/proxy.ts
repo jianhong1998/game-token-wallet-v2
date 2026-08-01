@@ -7,7 +7,7 @@ export const config = {
 
 const PUBLIC_PATHS = new Set(["/login", "/register"]);
 
-export async function middleware(request: NextRequest): Promise<NextResponse> {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");

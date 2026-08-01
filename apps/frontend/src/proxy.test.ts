@@ -4,16 +4,16 @@ import { NextRequest } from "next/server";
 const { mockVerifySessionCookie } = vi.hoisted(() => ({ mockVerifySessionCookie: vi.fn() }));
 vi.mock("./server/session", () => ({ verifySessionCookie: mockVerifySessionCookie }));
 
-import { middleware } from "./middleware";
+import { proxy } from "./proxy";
 
-describe("middleware", () => {
+describe("proxy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("redirects to /login for an unauthenticated visitor to the root dashboard", async () => {
     const request = new NextRequest("http://localhost/");
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBe("http://localhost/login");
   });
 
@@ -22,37 +22,37 @@ describe("middleware", () => {
     const request = new NextRequest("http://localhost/", {
       headers: { cookie: "session=good-value" },
     });
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBeNull();
   });
 
   it("allows /login through without a session", async () => {
     const request = new NextRequest("http://localhost/login");
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBeNull();
   });
 
   it("allows /register through without a session", async () => {
     const request = new NextRequest("http://localhost/register");
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBeNull();
   });
 
   it("allows /admin/registry through without a session", async () => {
     const request = new NextRequest("http://localhost/admin/registry");
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBeNull();
   });
 
   it("redirects to /login for a path that merely shares the /admin string prefix", async () => {
     const request = new NextRequest("http://localhost/administrator");
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBe("http://localhost/login");
   });
 
   it("redirects to /login when there is no session cookie on a protected route", async () => {
     const request = new NextRequest("http://localhost/home");
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBe("http://localhost/login");
   });
 
@@ -61,7 +61,7 @@ describe("middleware", () => {
     const request = new NextRequest("http://localhost/home", {
       headers: { cookie: "session=bad-value" },
     });
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBe("http://localhost/login");
   });
 
@@ -70,7 +70,7 @@ describe("middleware", () => {
     const request = new NextRequest("http://localhost/home", {
       headers: { cookie: "session=good-value" },
     });
-    const response = await middleware(request);
+    const response = await proxy(request);
     expect(response.headers.get("location")).toBeNull();
   });
 });
