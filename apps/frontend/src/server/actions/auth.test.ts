@@ -16,19 +16,10 @@ vi.mock("on-chain-client", () => ({
   getCreateUserInstructionAsync: mockGetCreateUserInstructionAsync,
 }));
 
-const { mockSignTransactionMessageWithSigners, mockSendAndConfirmTransaction } = vi.hoisted(() => ({
-  mockSignTransactionMessageWithSigners: vi.fn(),
-  mockSendAndConfirmTransaction: vi.fn(),
+const { mockSignAndSendTransaction } = vi.hoisted(() => ({
+  mockSignAndSendTransaction: vi.fn(),
 }));
-vi.mock("@solana/kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@solana/kit")>();
-  return {
-    ...actual,
-    signTransactionMessageWithSigners: mockSignTransactionMessageWithSigners,
-    assertIsTransactionWithBlockhashLifetime: vi.fn(),
-    sendAndConfirmTransactionFactory: () => mockSendAndConfirmTransaction,
-  };
-});
+vi.mock("../transaction", () => ({ signAndSendTransaction: mockSignAndSendTransaction }));
 
 const { mockCookieStore, mockHeadersStore } = vi.hoisted(() => ({
   mockCookieStore: { get: vi.fn(), set: vi.fn(), delete: vi.fn() },
@@ -77,8 +68,7 @@ describe("registerUser", () => {
       accounts: [],
       data: new Uint8Array(),
     });
-    mockSignTransactionMessageWithSigners.mockResolvedValue({});
-    mockSendAndConfirmTransaction.mockResolvedValue(undefined);
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
   });
 
   it("rejects an invalid username before touching the chain", async () => {
@@ -107,7 +97,7 @@ describe("registerUser", () => {
       registerUser({ username: "alice", password: "Abcdef12", confirmPassword: "Abcdef12" }),
     ).resolves.toEqual({ ok: true });
 
-    expect(mockSendAndConfirmTransaction).toHaveBeenCalledTimes(1);
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
     expect(mockCookieStore.set).toHaveBeenCalledWith(
       "session",
       expect.any(String),
@@ -144,7 +134,7 @@ describe("registerUser", () => {
   });
 
   it("surfaces a friendly error when the username is already taken", async () => {
-    mockSendAndConfirmTransaction.mockRejectedValue(new Error("already in use"));
+    mockSignAndSendTransaction.mockRejectedValue(new Error("already in use"));
     mockFetchMaybeUser.mockResolvedValue({
       exists: true,
       address: USER_ADDRESS,
