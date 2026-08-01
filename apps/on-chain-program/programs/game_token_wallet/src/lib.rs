@@ -16,10 +16,6 @@ declare_id!("FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t");
 pub mod game_token_wallet {
     use super::*;
 
-    pub fn noop(_ctx: Context<Noop>) -> Result<()> {
-        Ok(())
-    }
-
     pub fn initialize_registry(ctx: Context<InitializeRegistry>) -> Result<()> {
         instructions::registry::initialize::handler(ctx)
     }
@@ -42,6 +38,3 @@ pub mod game_token_wallet {
         instructions::game::create_game::handler(ctx, game_id, name, username)
     }
 }
-
-#[derive(Accounts)]
-pub struct Noop {}
