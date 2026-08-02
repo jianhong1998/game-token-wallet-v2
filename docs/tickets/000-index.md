@@ -17,7 +17,7 @@ touches one of those areas.
 | 002 | Registry account + init                                                                   | 001           | Done    |
 | 003 | User registration & login                                                                 | 001, 017      | Done    |
 | 004 | Devnet deploy pipeline + Docker self-host                                                 | 001, 003      | Pending |
-| 005 | Create game (General Mode, public)                                                        | 002, 003      | Pending |
+| 005 | Create game (General Mode, public)                                                        | 002, 003      | Done    |
 | 006 | Join game (public)                                                                        | 005           | Pending |
 | 007 | Private games (password-protected)                                                        | 005, 006      | Pending |
 | 008 | Deposit / mint to player                                                                  | 006           | Pending |
@@ -96,5 +96,5 @@ graph TD
     classDef done stroke:#2ecc71,stroke-width:3px;
     classDef inProgress stroke:#f1c40f,stroke-width:3px;
 
-    class 001,002,003,017,019,020 done;
+    class 001,002,003,005,017,019,020 done;
 ```
