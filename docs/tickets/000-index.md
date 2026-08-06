@@ -33,6 +33,7 @@ touches one of those areas.
 | 018 | Home dashboard, nav, and account screen                                                   | 005, 006, 019 | Pending |
 | 019 | Remove no-op scaffolding; relocate dashboard to `/`                                       | 001, 003      | Done    |
 | 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Done    |
+| 021 | Auto-join admin as player at game creation                                               | 005, 006      | Pending |
 
 ## Dependency diagram
 
@@ -58,6 +59,7 @@ graph TD
     018["018 Home dashboard, nav, and account screen"]
     019["019 Remove no-op scaffolding; relocate dashboard to /"]
     020["020 Redirect authenticated users off login/register; migrate to proxy.ts"]
+    021["021 Auto-join admin as player at game creation"]
 
     001 --> 002
     001 --> 017
@@ -92,6 +94,8 @@ graph TD
     001 --> 020
     003 --> 020
     019 --> 020
+    005 --> 021
+    006 --> 021
 
     classDef done stroke:#2ecc71,stroke-width:3px;
     classDef inProgress stroke:#f1c40f,stroke-width:3px;
