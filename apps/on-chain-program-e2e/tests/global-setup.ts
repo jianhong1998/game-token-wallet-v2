@@ -13,7 +13,7 @@ import {
   lamports,
   assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
-import { getInitializeRegistryInstructionAsync } from "on-chain-client";
+import { getInitializeRegistryInstructionAsync, findRegistryPda, fetchMaybeRegistry } from "on-chain-client";
 
 const RPC_URL = process.env.SOLANA_RPC_URL ?? "http://127.0.0.1:8899";
 const RPC_WS_URL = process.env.SOLANA_RPC_WS_URL ?? "ws://127.0.0.1:8900";
@@ -29,9 +29,29 @@ const RPC_WS_URL = process.env.SOLANA_RPC_WS_URL ?? "ws://127.0.0.1:8900";
 // guarantees runs to completion, once, in a single process, before any test
 // file starts (regardless of file parallelism), so it's the only place that
 // can safely own this.
+//
+// `test-e2e-program` runs `anchor test --skip-local-validator` against a
+// persistent docker validator (see justfile), not a fresh one per invocation
+// — a second consecutive `just test`/`just test-e2e-program` run (no
+// `just down-clean` in between) hits this same globalSetup again against a
+// Registry PDA that already exists from the first run. `initialize_registry`
+// uses Anchor's `init` constraint (see instructions/registry/initialize.rs),
+// which can only ever succeed once per PDA — a second call fails with a raw
+// "already in use" system-program error, not a custom ErrorCode. Guard with
+// an existence check (the same fetchMaybe*/`.exists` pattern the generated
+// on-chain-client uses elsewhere) so repeated runs against the same
+// validator state are idempotent instead of hard-failing globalSetup before
+// any test executes.
 export default async function setup(): Promise<void> {
   const rpc = createSolanaRpc(RPC_URL);
   const rpcSubscriptions = createSolanaRpcSubscriptions(RPC_WS_URL);
+
+  const [registryAddress] = await findRegistryPda();
+  const maybeRegistry = await fetchMaybeRegistry(rpc, registryAddress);
+  if (maybeRegistry.exists) {
+    return;
+  }
+
   const admin = await generateKeyPairSigner();
 
   const airdrop = airdropFactory({ rpc, rpcSubscriptions });

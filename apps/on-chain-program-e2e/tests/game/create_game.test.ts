@@ -108,8 +108,18 @@ async function registeredAdmin(
   return admin;
 }
 
+// `fill` only disambiguates call sites for a human reading a single test
+// run; the remaining bytes are randomized so the resulting Game PDA is
+// unique across repeated `just test-e2e-program` invocations against the
+// same persistent validator (no `just down-clean` in between) — otherwise a
+// second run's `create_game` for the same fixed id would hit the same
+// "account already in use" class of failure that global-setup.ts's registry
+// init used to (see tests/global-setup.ts).
 function gameId(fill: number): Uint8Array {
-  return new Uint8Array(16).fill(fill);
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[0] = fill;
+  return bytes;
 }
 
 describe("create_game instruction", () => {
