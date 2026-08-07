@@ -17,6 +17,7 @@ import {
   fetchMaybeGame,
   getCreateGameInstructionAsync,
   getJoinGameInstructionAsync,
+  type GameMode,
 } from "on-chain-client";
 import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import { normalizeGameName, validateGameName } from "@/lib/game-name";
@@ -145,4 +146,52 @@ export async function joinGame(gameAddress: string): Promise<JoinGameResult> {
   await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
 
   return { ok: true };
+}
+
+export interface BrowseGame {
+  address: string;
+  name: string;
+  mode: GameMode;
+  playerCount: number;
+  isMember: boolean;
+}
+
+export async function listBrowseGames(): Promise<BrowseGame[]> {
+  const username = await getCurrentUsername();
+  if (!username) return [];
+
+  const { rpc, adminSigner, programAddress } = await getSolanaContext();
+  const [registryAddress] = await findRegistryPda({ programAddress });
+  const registry = await fetchMaybeRegistry(rpc, registryAddress);
+  if (!registry.exists) return [];
+
+  const games = await Promise.all(
+    registry.data.activeGames.map((gameAddress) => fetchGame(rpc, gameAddress)),
+  );
+
+  const [userAddress] = await findUserPda(
+    { username, admin: adminSigner.address },
+    { programAddress },
+  );
+  const playerAtas = await Promise.all(
+    games.map(({ data }) =>
+      findAssociatedTokenPda({
+        owner: userAddress,
+        mint: data.mint,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      }),
+    ),
+  );
+  const ataAddresses = playerAtas.map(([address]) => address);
+  const { value: ataAccounts } = ataAddresses.length
+    ? await rpc.getMultipleAccounts(ataAddresses).send()
+    : { value: [] as (unknown | null)[] };
+
+  return games.map((game, index) => ({
+    address: game.address,
+    name: game.data.name,
+    mode: game.data.mode,
+    playerCount: game.data.playerCount,
+    isMember: ataAccounts[index] !== null,
+  }));
 }
