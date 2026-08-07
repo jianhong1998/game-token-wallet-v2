@@ -22,11 +22,15 @@ export default function BrowseGameRow({ game }: { game: BrowseGame }) {
     }
     setError(null);
     startTransition(async () => {
-      const result = await joinGame(game.address);
-      if (result.ok) {
-        router.push(`/games/${game.address}`);
-      } else {
-        setError(result.error);
+      try {
+        const result = await joinGame(game.address);
+        if (result.ok) {
+          router.push(`/games/${game.address}`);
+        } else {
+          setError(result.error);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       }
     });
   }

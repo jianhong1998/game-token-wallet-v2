@@ -7,6 +7,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
   fetchEncodedAccount,
+  unwrapSimulationError,
   type Address,
   type Base58EncodedBytes,
 } from "@solana/kit";
@@ -19,6 +20,9 @@ import {
   getCreateGameInstructionAsync,
   getJoinGameInstructionAsync,
   fetchAllUser,
+  isGameTokenWalletError,
+  GAME_TOKEN_WALLET_ERROR__GAME_FULL,
+  GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
   type GameMode,
 } from "on-chain-client";
 import {
@@ -149,7 +153,32 @@ export async function joinGame(gameAddress: string): Promise<JoinGameResult> {
     (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
     (tx) => appendTransactionMessageInstructions([joinGameInstruction], tx),
   );
-  await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+  try {
+    await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+  } catch (error) {
+    // The client-side checks above (player cap, existing ATA) are best-effort
+    // pre-checks against possibly-stale state — under a race (two players
+    // joining a near-full game, or a stale browse-list) the on-chain program
+    // is still the source of truth and can reject with GameFull or
+    // AlreadyJoinedGame even after those checks passed. Map only those known
+    // program errors to the same friendly messages the pre-checks use; any
+    // other error is unexpected and rethrown (same convention as
+    // registerUser's catch in ./auth.ts).
+    const cause = unwrapSimulationError(error);
+    if (isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__GAME_FULL)) {
+      return { ok: false, error: "This game already has the maximum of 20 players" };
+    }
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
+      )
+    ) {
+      return { ok: false, error: "You are already a player in this game" };
+    }
+    throw error;
+  }
 
   return { ok: true };
 }

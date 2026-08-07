@@ -57,7 +57,10 @@ describe("BrowseGameRow", () => {
   });
 
   it("shows an error and does not navigate when joining fails", async () => {
-    mockJoinGame.mockResolvedValue({ ok: false, error: "This game already has the maximum of 20 players" });
+    mockJoinGame.mockResolvedValue({
+      ok: false,
+      error: "This game already has the maximum of 20 players",
+    });
     render(
       <BrowseGameRow
         game={{ address: "Game1", name: "Friday Poker", mode: 0, playerCount: 20, isMember: false }}
@@ -65,8 +68,22 @@ describe("BrowseGameRow", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Join" }));
     await waitFor(() =>
-      expect(screen.getByText("This game already has the maximum of 20 players")).toBeInTheDocument(),
+      expect(
+        screen.getByText("This game already has the maximum of 20 players"),
+      ).toBeInTheDocument(),
     );
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("shows a fallback error alert when joinGame throws an unexpected error", async () => {
+    mockJoinGame.mockRejectedValue(new Error("Network error"));
+    render(
+      <BrowseGameRow
+        game={{ address: "Game1", name: "Friday Poker", mode: 0, playerCount: 5, isMember: false }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Join" }));
+    await waitFor(() => expect(screen.getByTestId("join-game-error")).toBeInTheDocument());
     expect(mockPush).not.toHaveBeenCalled();
   });
 });

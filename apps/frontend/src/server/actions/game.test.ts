@@ -20,6 +20,7 @@ const {
   mockGetCreateGameInstructionAsync,
   mockGetJoinGameInstructionAsync,
   mockFetchAllUser,
+  mockIsGameTokenWalletError,
 } = vi.hoisted(() => ({
   mockFindUserPda: vi.fn(),
   mockFindRegistryPda: vi.fn(),
@@ -29,6 +30,15 @@ const {
   mockGetCreateGameInstructionAsync: vi.fn(),
   mockGetJoinGameInstructionAsync: vi.fn(),
   mockFetchAllUser: vi.fn(),
+  mockIsGameTokenWalletError: vi.fn(),
+}));
+// Mirrors on-chain-client's actual generated error codes (see
+// apps/on-chain-client/src/generated/errors/gameTokenWallet.ts) — only the
+// two codes joinGame() maps to friendly messages need real values here since
+// mockIsGameTokenWalletError compares against them directly.
+const { GAME_FULL_CODE, ALREADY_JOINED_GAME_CODE } = vi.hoisted(() => ({
+  GAME_FULL_CODE: 0x1774,
+  ALREADY_JOINED_GAME_CODE: 0x1775,
 }));
 vi.mock("on-chain-client", () => ({
   findUserPda: mockFindUserPda,
@@ -39,6 +49,9 @@ vi.mock("on-chain-client", () => ({
   getCreateGameInstructionAsync: mockGetCreateGameInstructionAsync,
   getJoinGameInstructionAsync: mockGetJoinGameInstructionAsync,
   fetchAllUser: mockFetchAllUser,
+  isGameTokenWalletError: mockIsGameTokenWalletError,
+  GAME_TOKEN_WALLET_ERROR__GAME_FULL: GAME_FULL_CODE,
+  GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME: ALREADY_JOINED_GAME_CODE,
 }));
 
 const { mockFindAssociatedTokenPda, mockGetTokenDecoder } = vi.hoisted(() => ({
@@ -230,12 +243,39 @@ describe("joinGame", () => {
       data: new Uint8Array(),
     });
     mockSignAndSendTransaction.mockResolvedValue(undefined);
+    mockIsGameTokenWalletError.mockReturnValue(false);
   });
 
   it("rejects when not signed in, without touching the chain", async () => {
     mockGetCurrentUsername.mockResolvedValue(null);
     await expect(joinGame(GAME_ADDRESS)).resolves.toEqual({ ok: false, error: "Not signed in" });
     expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("maps an on-chain GameFull rejection (lost the race after the client-side pre-check) to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation((_error, _tx, code) => code === GAME_FULL_CODE);
+    await expect(joinGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "This game already has the maximum of 20 players",
+    });
+  });
+
+  it("maps an on-chain AlreadyJoinedGame rejection (stale browse list) to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === ALREADY_JOINED_GAME_CODE,
+    );
+    await expect(joinGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "You are already a player in this game",
+    });
+  });
+
+  it("re-throws an on-chain error that isn't a recognized join_game program error", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("network blip"));
+    mockIsGameTokenWalletError.mockReturnValue(false);
+    await expect(joinGame(GAME_ADDRESS)).rejects.toThrow("network blip");
   });
 
   it("rejects when the game doesn't exist", async () => {
