@@ -8,6 +8,7 @@ import {
   appendTransactionMessageInstructions,
   fetchEncodedAccount,
   type Address,
+  type Base58EncodedBytes,
 } from "@solana/kit";
 import {
   findUserPda,
@@ -17,9 +18,14 @@ import {
   fetchMaybeGame,
   getCreateGameInstructionAsync,
   getJoinGameInstructionAsync,
+  fetchAllUser,
   type GameMode,
 } from "on-chain-client";
-import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
+import {
+  findAssociatedTokenPda,
+  getTokenDecoder,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
 import { normalizeGameName, validateGameName } from "@/lib/game-name";
 import { getSolanaContext } from "../connection";
 import { generateGameId } from "../game-id";
@@ -194,4 +200,76 @@ export async function listBrowseGames(): Promise<BrowseGame[]> {
     playerCount: game.data.playerCount,
     isMember: ataAccounts[index] !== null,
   }));
+}
+
+export interface GamePlayer {
+  username: string;
+  balance: number;
+  isAdmin: boolean;
+}
+
+export interface GameDetail {
+  address: string;
+  name: string;
+  mode: GameMode;
+  isAdmin: boolean;
+  myBalance: number;
+  players: GamePlayer[];
+}
+
+export async function fetchGameDetail(gameAddress: string): Promise<GameDetail | null> {
+  const username = await getCurrentUsername();
+  if (!username) return null;
+
+  const { rpc, adminSigner, programAddress } = await getSolanaContext();
+  const game = await fetchMaybeGame(rpc, gameAddress as Address);
+  if (!game.exists) return null;
+
+  const [userAddress] = await findUserPda(
+    { username, admin: adminSigner.address },
+    { programAddress },
+  );
+
+  const { value: tokenAccounts } = await rpc
+    .getProgramAccounts(TOKEN_PROGRAM_ADDRESS, {
+      encoding: "base64",
+      withContext: true,
+      filters: [
+        { dataSize: 165n },
+        {
+          memcmp: {
+            offset: 0n,
+            bytes: game.data.mint as unknown as Base58EncodedBytes,
+            encoding: "base58",
+          },
+        },
+      ],
+    })
+    .send();
+
+  const tokenDecoder = getTokenDecoder();
+  const holders = tokenAccounts.map(({ account }) => {
+    const decoded = tokenDecoder.decode(Buffer.from(account.data[0], "base64"));
+    return { owner: decoded.owner, balance: Number(decoded.amount) / 100 };
+  });
+
+  const owners = holders.map((holder) => holder.owner);
+  const userAccounts = owners.length ? await fetchAllUser(rpc, owners) : [];
+
+  const players: GamePlayer[] = holders.map((holder, index) => ({
+    username: userAccounts[index].data.username,
+    balance: holder.balance,
+    isAdmin: holder.owner === game.data.admin,
+  }));
+
+  const myHolderIndex = owners.findIndex((owner) => owner === userAddress);
+
+  return {
+    address: game.address,
+    name: game.data.name,
+    mode: game.data.mode,
+    isAdmin: game.data.admin === userAddress,
+    myBalance: myHolderIndex === -1 ? 0 : holders[myHolderIndex].balance,
+    players,
+  };
 }

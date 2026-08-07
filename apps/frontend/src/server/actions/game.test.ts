@@ -19,6 +19,7 @@ const {
   mockFetchMaybeGame,
   mockGetCreateGameInstructionAsync,
   mockGetJoinGameInstructionAsync,
+  mockFetchAllUser,
 } = vi.hoisted(() => ({
   mockFindUserPda: vi.fn(),
   mockFindRegistryPda: vi.fn(),
@@ -27,6 +28,7 @@ const {
   mockFetchMaybeGame: vi.fn(),
   mockGetCreateGameInstructionAsync: vi.fn(),
   mockGetJoinGameInstructionAsync: vi.fn(),
+  mockFetchAllUser: vi.fn(),
 }));
 vi.mock("on-chain-client", () => ({
   findUserPda: mockFindUserPda,
@@ -36,13 +38,16 @@ vi.mock("on-chain-client", () => ({
   fetchMaybeGame: mockFetchMaybeGame,
   getCreateGameInstructionAsync: mockGetCreateGameInstructionAsync,
   getJoinGameInstructionAsync: mockGetJoinGameInstructionAsync,
+  fetchAllUser: mockFetchAllUser,
 }));
 
-const { mockFindAssociatedTokenPda } = vi.hoisted(() => ({
+const { mockFindAssociatedTokenPda, mockGetTokenDecoder } = vi.hoisted(() => ({
   mockFindAssociatedTokenPda: vi.fn(),
+  mockGetTokenDecoder: vi.fn(),
 }));
 vi.mock("@solana-program/token", () => ({
   findAssociatedTokenPda: mockFindAssociatedTokenPda,
+  getTokenDecoder: mockGetTokenDecoder,
   TOKEN_PROGRAM_ADDRESS: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 }));
 
@@ -57,7 +62,7 @@ const { mockSignAndSendTransaction } = vi.hoisted(() => ({
 }));
 vi.mock("../transaction", () => ({ signAndSendTransaction: mockSignAndSendTransaction }));
 
-import { createGame, listMyGames, joinGame, listBrowseGames } from "./game";
+import { createGame, listMyGames, joinGame, listBrowseGames, fetchGameDetail } from "./game";
 
 const ADMIN_ADDRESS = "Admin111111111111111111111111111111111111";
 const USER_ADDRESS = "User1111111111111111111111111111111111111";
@@ -336,5 +341,78 @@ describe("listBrowseGames", () => {
       { address: "Game2", name: "Not joined", mode: 0, playerCount: 2, isMember: false },
     ]);
     expect(mockGetMultipleAccounts).toHaveBeenCalledWith(["Ata1", "Ata2"]);
+  });
+});
+
+describe("fetchGameDetail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("bob");
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+  });
+
+  it("returns null when not signed in", async () => {
+    mockGetCurrentUsername.mockResolvedValue(null);
+    await expect(fetchGameDetail(GAME_ADDRESS)).resolves.toBeNull();
+  });
+
+  it("returns null when the game doesn't exist", async () => {
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeGame.mockResolvedValue({ exists: false });
+    await expect(fetchGameDetail(GAME_ADDRESS)).resolves.toBeNull();
+  });
+
+  it("returns the roster with balances and identifies the viewer and the admin", async () => {
+    mockFetchMaybeGame.mockResolvedValue({
+      exists: true,
+      address: GAME_ADDRESS,
+      data: gameData({
+        admin: "AdminUser1111111111111111111111111111111" as Address,
+        mint: MINT_ADDRESS,
+      }),
+    });
+    const rawTokenAccountBase64 = "ZmFrZS10b2tlbi1hY2NvdW50LWJ5dGVz";
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {
+        getProgramAccounts: () => ({
+          send: async () => ({
+            value: [
+              { pubkey: "PlayerAta1", account: { data: [rawTokenAccountBase64, "base64"] } },
+              { pubkey: "PlayerAta2", account: { data: [rawTokenAccountBase64, "base64"] } },
+            ],
+          }),
+        }),
+      },
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockGetTokenDecoder.mockReturnValue({
+      decode: vi
+        .fn()
+        .mockReturnValueOnce({ owner: "AdminUser1111111111111111111111111111111", amount: 400n })
+        .mockReturnValueOnce({ owner: USER_ADDRESS, amount: 150n }),
+    });
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+    mockFetchAllUser.mockResolvedValue([
+      { data: { username: "alice" } },
+      { data: { username: "bob" } },
+    ]);
+
+    const detail = await fetchGameDetail(GAME_ADDRESS);
+    expect(detail).toEqual({
+      address: GAME_ADDRESS,
+      name: "Friday Poker",
+      mode: 0,
+      isAdmin: false,
+      myBalance: 1.5,
+      players: [
+        { username: "alice", balance: 4, isAdmin: true },
+        { username: "bob", balance: 1.5, isAdmin: false },
+      ],
+    });
   });
 });
