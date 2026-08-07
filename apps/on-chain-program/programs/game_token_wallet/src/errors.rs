@@ -10,4 +10,10 @@ pub enum ErrorCode {
     InvalidGameNameCharacters,
     #[msg("Registry is full")]
     RegistryFull,
+    #[msg("Game already has the maximum of 20 players")]
+    GameFull,
+    #[msg("You are already a player in this game")]
+    AlreadyJoinedGame,
+    #[msg("Player token account address does not match the expected associated token account")]
+    InvalidPlayerAta,
 }
