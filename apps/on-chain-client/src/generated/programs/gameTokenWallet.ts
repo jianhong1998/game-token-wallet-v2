@@ -20,9 +20,11 @@ import {
   parseCreateGameInstruction,
   parseCreateUserInstruction,
   parseInitializeRegistryInstruction,
+  parseJoinGameInstruction,
   type ParsedCreateGameInstruction,
   type ParsedCreateUserInstruction,
   type ParsedInitializeRegistryInstruction,
+  type ParsedJoinGameInstruction,
 } from "../instructions";
 
 export const GAME_TOKEN_WALLET_PROGRAM_ADDRESS =
@@ -80,6 +82,7 @@ export enum GameTokenWalletInstruction {
   CreateGame,
   CreateUser,
   InitializeRegistry,
+  JoinGame,
 }
 
 export function identifyGameTokenWalletInstruction(
@@ -119,6 +122,17 @@ export function identifyGameTokenWalletInstruction(
   ) {
     return GameTokenWalletInstruction.InitializeRegistry;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([107, 112, 18, 38, 56, 173, 60, 128]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.JoinGame;
+  }
   throw new Error(
     "The provided instruction could not be identified as a gameTokenWallet instruction.",
   );
@@ -135,7 +149,10 @@ export type ParsedGameTokenWalletInstruction<
     } & ParsedCreateUserInstruction<TProgram>)
   | ({
       instructionType: GameTokenWalletInstruction.InitializeRegistry;
-    } & ParsedInitializeRegistryInstruction<TProgram>);
+    } & ParsedInitializeRegistryInstruction<TProgram>)
+  | ({
+      instructionType: GameTokenWalletInstruction.JoinGame;
+    } & ParsedJoinGameInstruction<TProgram>);
 
 export function parseGameTokenWalletInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
@@ -161,6 +178,13 @@ export function parseGameTokenWalletInstruction<TProgram extends string>(
       return {
         instructionType: GameTokenWalletInstruction.InitializeRegistry,
         ...parseInitializeRegistryInstruction(instruction),
+      };
+    }
+    case GameTokenWalletInstruction.JoinGame: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.JoinGame,
+        ...parseJoinGameInstruction(instruction),
       };
     }
     default:
