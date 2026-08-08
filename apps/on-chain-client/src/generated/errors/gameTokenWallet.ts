@@ -22,10 +22,19 @@ export const GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH = 0x1771; // 6001
 export const GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS = 0x1772; // 6002
 /** RegistryFull: Registry is full */
 export const GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL = 0x1773; // 6003
+/** GameFull: Game already has the maximum of 20 players */
+export const GAME_TOKEN_WALLET_ERROR__GAME_FULL = 0x1774; // 6004
+/** AlreadyJoinedGame: You are already a player in this game */
+export const GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME = 0x1775; // 6005
+/** InvalidPlayerAta: Player token account address does not match the expected associated token account */
+export const GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA = 0x1776; // 6006
 
 export type GameTokenWalletError =
+  | typeof GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME
+  | typeof GAME_TOKEN_WALLET_ERROR__GAME_FULL
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH
+  | typeof GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_USERNAME_LENGTH
   | typeof GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL;
 
@@ -33,8 +42,11 @@ let gameTokenWalletErrorMessages:
   Record<GameTokenWalletError, string> | undefined;
 if (process.env.NODE_ENV !== "production") {
   gameTokenWalletErrorMessages = {
+    [GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME]: `You are already a player in this game`,
+    [GAME_TOKEN_WALLET_ERROR__GAME_FULL]: `Game already has the maximum of 20 players`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS]: `Game name can only contain letters, numbers, and spaces`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH]: `Game name must be between 3 and 32 bytes`,
+    [GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA]: `Player token account address does not match the expected associated token account`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_USERNAME_LENGTH]: `Username must be between 3 and 32 bytes`,
     [GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL]: `Registry is full`,
   };

@@ -15,6 +15,10 @@ import {
   GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS,
   GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL,
   isGameTokenWalletError,
+  getJoinGameInstructionAsync,
+  GAME_TOKEN_WALLET_ERROR__GAME_FULL,
+  GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
+  GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA,
 } from "./index";
 
 describe("generated on-chain-client", () => {
@@ -44,5 +48,12 @@ describe("generated on-chain-client", () => {
     expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH).toBe("number");
     expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS).toBe("number");
     expect(typeof GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL).toBe("number");
+  });
+
+  it("exports a join_game instruction builder and its error helpers", () => {
+    expect(typeof getJoinGameInstructionAsync).toBe("function");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__GAME_FULL).toBe("number");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME).toBe("number");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA).toBe("number");
   });
 });

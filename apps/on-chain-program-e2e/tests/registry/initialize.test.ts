@@ -43,8 +43,30 @@ async function sendInitializeRegistry(
   await sendAndConfirmTransaction(signedTransaction, { commitment: "confirmed" });
 }
 
+// Registry is a program-wide singleton PDA (seeds = [b"registry"]), created
+// once by tests/global-setup.ts before any test file in this suite runs (see
+// that file for why: initialize_registry can only ever succeed once per
+// chain, and sibling files' create_game calls require the registry to
+// already exist). Because it's a singleton shared by every file here —
+// concurrently or not — this test does NOT call initialize_registry itself
+// and does NOT assert `activeGames` is empty: by the time this test's `it()`
+// body runs, sibling files (create_game.test.ts, join_game.test.ts) may have
+// already appended entries, so global emptiness is not a stable invariant to
+// assert from inside a test file. Instead it asserts the two things that ARE
+// true regardless of run order: the singleton exists in a properly
+// initialized shape, and a second initialize_registry call is rejected.
 describe("initialize_registry instruction", () => {
-  it("creates the Registry account with an empty active-games list, and rejects a second call cleanly", async () => {
+  it("exposes the Registry singleton that global setup already initialized", async () => {
+    const rpc = createSolanaRpc(RPC_URL);
+
+    const [registryAddress] = await findRegistryPda();
+    const registryAccount = await fetchRegistry(rpc, registryAddress);
+
+    expect(typeof registryAccount.data.bump).toBe("number");
+    expect(Array.isArray(registryAccount.data.activeGames)).toBe(true);
+  }, 30_000);
+
+  it("rejects a second initialize_registry call cleanly", async () => {
     const rpc = createSolanaRpc(RPC_URL);
     const rpcSubscriptions = createSolanaRpcSubscriptions(RPC_WS_URL);
     const admin = await generateKeyPairSigner();
@@ -55,12 +77,6 @@ describe("initialize_registry instruction", () => {
       recipientAddress: admin.address,
       lamports: lamports(1_000_000_000n),
     });
-
-    await sendInitializeRegistry(rpc, rpcSubscriptions, admin);
-
-    const [registryAddress] = await findRegistryPda();
-    const registryAccount = await fetchRegistry(rpc, registryAddress);
-    expect(registryAccount.data.activeGames).toEqual([]);
 
     await expect(sendInitializeRegistry(rpc, rpcSubscriptions, admin)).rejects.toThrow();
   }, 30_000);

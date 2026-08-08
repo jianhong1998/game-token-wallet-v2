@@ -87,6 +87,10 @@ pub fn handler(
     game.mode = GameMode::General;
     game.admin = ctx.accounts.user.key();
     game.mint = ctx.accounts.mint.key();
+    // Plan snippet referenced `ctx.accounts.creator_user`, but this file's
+    // account field is named `user` (see the struct's Codama-canonicalization
+    // comment above) — using the actual existing field, not the stale name.
+    game.player_count = 0;
     let game_key = game.key();
 
     ctx.accounts.registry.active_games.push(game_key);

@@ -66,6 +66,7 @@ export type Game = {
   mode: GameMode;
   admin: Address;
   mint: Address;
+  playerCount: number;
 };
 
 export type GameArgs = {
@@ -76,6 +77,7 @@ export type GameArgs = {
   mode: GameModeArgs;
   admin: Address;
   mint: Address;
+  playerCount: number;
 };
 
 /** Gets the encoder for {@link GameArgs} account data. */
@@ -90,6 +92,7 @@ export function getGameEncoder(): Encoder<GameArgs> {
       ["mode", getGameModeEncoder()],
       ["admin", getAddressEncoder()],
       ["mint", getAddressEncoder()],
+      ["playerCount", getU8Encoder()],
     ]),
     (value) => ({ ...value, discriminator: GAME_DISCRIMINATOR }),
   );
@@ -106,6 +109,7 @@ export function getGameDecoder(): Decoder<Game> {
     ["mode", getGameModeDecoder()],
     ["admin", getAddressDecoder()],
     ["mint", getAddressDecoder()],
+    ["playerCount", getU8Decoder()],
   ]);
 }
 

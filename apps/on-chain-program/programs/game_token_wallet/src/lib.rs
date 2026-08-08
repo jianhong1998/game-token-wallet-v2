@@ -37,4 +37,8 @@ pub mod game_token_wallet {
     ) -> Result<()> {
         instructions::game::create_game::handler(ctx, game_id, name, username)
     }
+
+    pub fn join_game(ctx: Context<JoinGame>, game_id: [u8; 16], username: String) -> Result<()> {
+        instructions::game::join_game::handler(ctx, game_id, username)
+    }
 }
