@@ -1,6 +1,6 @@
 ## Purpose
 
-Per-game on-chain state: a `Game` PDA and its own SPL mint, created by a logged-in user who becomes its admin. Currently covers General Mode, public-visibility creation only — joining as a player, private games, deposits, transfers, and other modes are future work.
+Per-game on-chain state: a `Game` PDA and its own SPL mint, created by a logged-in user who becomes its admin. Currently covers General Mode, public-visibility creation, and joining as a player (see the `join-game` capability) — private games, deposits, transfers, and other modes are future work.
 
 ## Requirements
 
@@ -58,3 +58,14 @@ The system SHALL let a logged-in user view a list of the games they administer, 
 #### Scenario: Empty state before any game is created
 - **WHEN** a logged-in user with no created games views their own games list
 - **THEN** the system shows an empty state rather than an empty or missing list
+
+### Requirement: Game player count
+The system SHALL track a `player_count` on each `Game` account, initialized to 0 at creation and incremented by one each time a player successfully joins. This count does not itself constitute a membership list — player membership remains tracked implicitly via each player's per-game Associated Token Account (ATA) existence/balance.
+
+#### Scenario: Count starts at zero
+- **WHEN** a game is created
+- **THEN** its `player_count` is 0
+
+#### Scenario: Count increases as players join
+- **WHEN** a player successfully joins a game
+- **THEN** the game's `player_count` increases by one
