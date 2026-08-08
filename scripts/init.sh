@@ -3,6 +3,10 @@ chmod +x ../.hooks/*
 git config core.hooksPath ./.hooks
 echo "✅ Git hooks are initialized"
 
+# Configure Git auto setup remote
+git config push.autoSetupRemote true
+echo "✅ Git 'auto setup remote' is initialized"
+
 # Setup Anchor program keypair
 mkdir -p ../apps/on-chain-program/target/deploy
 cp ../docker/local/fixtures/game_token_wallet-keypair.dev.json ../apps/on-chain-program/target/deploy/game_token_wallet-keypair.json

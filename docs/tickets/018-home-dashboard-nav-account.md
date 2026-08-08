@@ -8,6 +8,8 @@
 
 **Spec:** [2026-07-26-home-dashboard-nav-account-design.md](../superpowers/specs/2026-07-26-home-dashboard-nav-account-design.md)
 
+**Plan:** [2026-08-08-home-dashboard-nav-account.md](../superpowers/plans/2026-08-08-home-dashboard-nav-account.md)
+
 - [ ] `/` (the app root, per ticket 019) becomes the dashboard: lists every game the current user belongs to, as player or admin (per ticket 006's player list), each row showing the game's name/mode and the user's own token balance in that game's mint.
 - [ ] Rows for games where `Game.admin` matches the current user additionally show an "Admin" badge.
 - [ ] No aggregate "total balance" figure — each game has its own independent SPL mint (non-fungible across games), so no cross-game sum is shown.
