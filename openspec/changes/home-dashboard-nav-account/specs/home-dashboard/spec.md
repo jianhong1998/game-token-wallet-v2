@@ -11,6 +11,10 @@ The system SHALL render, at `/`, a row for every `Game` where the current user i
 - **WHEN** a signed-in user belongs to two or more games
 - **THEN** the system does not display any summed or total balance figure across those games
 
+#### Scenario: Admin game before the admin has joined as a player
+- **WHEN** a signed-in user is the admin of a game they have not joined as a player (no token account for that game's mint yet)
+- **THEN** the system still renders a row for that game, showing a balance of 0 and the Admin badge
+
 ### Requirement: Home empty state
 The system SHALL show an empty-state message plus a way to Create or Browse when the current user belongs to no games.
 
@@ -18,12 +22,12 @@ The system SHALL show an empty-state message plus a way to Create or Browse when
 - **WHEN** a signed-in user who belongs to no games requests `/`
 - **THEN** the system shows an empty-state message and actions to create a game or browse public games
 
-### Requirement: Home rows are non-interactive
-The system SHALL NOT provide navigation from a Home game row to a per-game detail page.
+### Requirement: Home rows link to the game detail page
+The system SHALL provide navigation from a Home game row to that game's detail page (`/games/[address]`).
 
-#### Scenario: Game row has no click-through
+#### Scenario: Game row links to its detail page
 - **WHEN** a signed-in user views a game row on Home
-- **THEN** the row displays name, mode, balance, and admin badge where applicable, but has no link or click handler to a detail page
+- **THEN** the row displays name, mode, balance, and admin badge where applicable, and navigates to that game's detail page when clicked
 
 ### Requirement: Persistent bottom navigation
 The system SHALL render a bottom navigation bar with Home, Browse, and You tabs on every page within the `(app)` route group, unconditionally.
