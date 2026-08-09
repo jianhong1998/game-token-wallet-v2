@@ -37,7 +37,9 @@ test("a second user can browse, join, and see themselves in the game's player li
 
   await secondPage.goto("/games/all");
   const row = secondPage.locator("li").filter({ hasText: "E2E Join Test Game" });
-  await expect(row).toContainText("0/20");
+  // Creator auto-joins at creation (ticket 021), so the game already shows
+  // 1/20 before the second user joins.
+  await expect(row).toContainText("1/20");
   await row.getByRole("button", { name: "Join" }).click();
 
   await expect(secondPage).toHaveURL(/\/games\/.+/, { timeout: 30_000 });
@@ -47,7 +49,7 @@ test("a second user can browse, join, and see themselves in the game's player li
   // Browsing again now shows "Open" instead of "Join" for the same game.
   await secondPage.goto("/games/all");
   const rowAfterJoin = secondPage.locator("li").filter({ hasText: "E2E Join Test Game" });
-  await expect(rowAfterJoin).toContainText("1/20");
+  await expect(rowAfterJoin).toContainText("2/20");
   await expect(rowAfterJoin.getByRole("button", { name: "Open" })).toBeVisible();
 
   await secondContext.close();
