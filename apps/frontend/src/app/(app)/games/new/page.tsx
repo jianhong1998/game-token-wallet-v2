@@ -23,7 +23,7 @@ export default function NewGamePage() {
       try {
         const result = await createGame({ name });
         if (result.ok) {
-          router.push("/games");
+          router.push("/");
         } else {
           setError(result.error);
         }

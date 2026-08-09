@@ -23,14 +23,14 @@ describe("NewGamePage", () => {
     expect(mockCreateGame).not.toHaveBeenCalled();
   });
 
-  it("submits and redirects to /games on success", async () => {
+  it("submits and redirects to / on success", async () => {
     mockCreateGame.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
     render(<NewGamePage />);
     await user.type(screen.getByLabelText("Game name"), "Friday Poker");
     await user.click(screen.getByRole("button", { name: "Create game" }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/games"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
     expect(mockCreateGame).toHaveBeenCalledWith({ name: "Friday Poker" });
   });
 
