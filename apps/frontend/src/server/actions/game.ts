@@ -231,6 +231,71 @@ export async function listBrowseGames(): Promise<BrowseGame[]> {
   }));
 }
 
+export interface MemberGame {
+  address: string;
+  name: string;
+  mode: GameMode;
+  balance: number;
+  isAdmin: boolean;
+}
+
+export async function listMyMemberGames(): Promise<MemberGame[]> {
+  const username = await getCurrentUsername();
+  if (!username) return [];
+
+  const { rpc, adminSigner, programAddress } = await getSolanaContext();
+  const [registryAddress] = await findRegistryPda({ programAddress });
+  const registry = await fetchMaybeRegistry(rpc, registryAddress);
+  if (!registry.exists) return [];
+
+  const games = await Promise.all(
+    registry.data.activeGames.map((gameAddress) => fetchGame(rpc, gameAddress)),
+  );
+
+  const [userAddress] = await findUserPda(
+    { username, admin: adminSigner.address },
+    { programAddress },
+  );
+
+  const atas = await Promise.all(
+    games.map(({ data }) =>
+      findAssociatedTokenPda({
+        owner: userAddress,
+        mint: data.mint,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      }),
+    ),
+  );
+  const ataAddresses = atas.map(([address]) => address);
+  const { value: ataAccounts } = ataAddresses.length
+    ? await rpc.getMultipleAccounts(ataAddresses).send()
+    : { value: [] as ({ data: [string, string] } | null)[] };
+
+  const tokenDecoder = getTokenDecoder();
+
+  const memberGames: MemberGame[] = [];
+  games.forEach((game, index) => {
+    const isAdmin = game.data.admin === userAddress;
+    const ataAccount = ataAccounts[index];
+    const isPlayer = ataAccount !== null;
+    if (!isAdmin && !isPlayer) return;
+
+    const balance = ataAccount
+      ? Number(tokenDecoder.decode(Buffer.from(ataAccount.data[0], "base64")).amount) / 100
+      : 0;
+
+    memberGames.push({
+      address: game.address,
+      name: game.data.name,
+      mode: game.data.mode,
+      balance,
+      isAdmin,
+    });
+  });
+
+  return memberGames;
+}
+
 export interface GamePlayer {
   username: string;
   balance: number;

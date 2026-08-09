@@ -75,7 +75,14 @@ const { mockSignAndSendTransaction } = vi.hoisted(() => ({
 }));
 vi.mock("../transaction", () => ({ signAndSendTransaction: mockSignAndSendTransaction }));
 
-import { createGame, listMyGames, joinGame, listBrowseGames, fetchGameDetail } from "./game";
+import {
+  createGame,
+  listMyGames,
+  joinGame,
+  listBrowseGames,
+  listMyMemberGames,
+  fetchGameDetail,
+} from "./game";
 
 const ADMIN_ADDRESS = "Admin111111111111111111111111111111111111";
 const USER_ADDRESS = "User1111111111111111111111111111111111111";
@@ -381,6 +388,192 @@ describe("listBrowseGames", () => {
       { address: "Game2", name: "Not joined", mode: 0, playerCount: 2, isMember: false },
     ]);
     expect(mockGetMultipleAccounts).toHaveBeenCalledWith(["Ata1", "Ata2"]);
+  });
+});
+
+describe("listMyMemberGames", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("bob");
+    mockFindRegistryPda.mockResolvedValue([REGISTRY_ADDRESS, 255]);
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+  });
+
+  it("returns an empty list when not signed in", async () => {
+    mockGetCurrentUsername.mockResolvedValue(null);
+    await expect(listMyMemberGames()).resolves.toEqual([]);
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty list when the registry doesn't exist yet", async () => {
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeRegistry.mockResolvedValue({ exists: false });
+    await expect(listMyMemberGames()).resolves.toEqual([]);
+  });
+
+  it("excludes games where the user is neither a player nor the admin", async () => {
+    mockFetchMaybeRegistry.mockResolvedValue({
+      exists: true,
+      address: REGISTRY_ADDRESS,
+      data: { discriminator: new Uint8Array(8), bump: 255, activeGames: ["Game1"] },
+    });
+    mockFetchGame.mockResolvedValueOnce({
+      address: "Game1",
+      data: gameData({
+        admin: "SomeoneElse11111111111111111111111111111" as Address,
+        mint: MINT_ADDRESS,
+      }),
+    });
+    mockFindAssociatedTokenPda.mockResolvedValueOnce(["Ata1", 254]);
+    const mockGetMultipleAccounts = vi.fn(() => ({ send: async () => ({ value: [null] }) }));
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: { getMultipleAccounts: mockGetMultipleAccounts },
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+
+    await expect(listMyMemberGames()).resolves.toEqual([]);
+  });
+
+  it("includes a player-only game with its decoded balance", async () => {
+    mockFetchMaybeRegistry.mockResolvedValue({
+      exists: true,
+      address: REGISTRY_ADDRESS,
+      data: { discriminator: new Uint8Array(8), bump: 255, activeGames: ["Game1"] },
+    });
+    mockFetchGame.mockResolvedValueOnce({
+      address: "Game1",
+      data: gameData({
+        name: "Friday Poker",
+        admin: "SomeoneElse11111111111111111111111111111" as Address,
+        mint: MINT_ADDRESS,
+      }),
+    });
+    mockFindAssociatedTokenPda.mockResolvedValueOnce(["Ata1", 254]);
+    const mockGetMultipleAccounts = vi.fn(() => ({
+      send: async () => ({ value: [{ data: ["ZmFrZQ==", "base64"] }] }),
+    }));
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: { getMultipleAccounts: mockGetMultipleAccounts },
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockGetTokenDecoder.mockReturnValue({
+      decode: vi.fn().mockReturnValue({ amount: 250n }),
+    });
+
+    await expect(listMyMemberGames()).resolves.toEqual([
+      { address: "Game1", name: "Friday Poker", mode: 0, balance: 2.5, isAdmin: false },
+    ]);
+    expect(mockGetMultipleAccounts).toHaveBeenCalledWith(["Ata1"]);
+  });
+
+  it("includes an admin-only game with balance 0 when the admin has no ATA yet", async () => {
+    mockFetchMaybeRegistry.mockResolvedValue({
+      exists: true,
+      address: REGISTRY_ADDRESS,
+      data: { discriminator: new Uint8Array(8), bump: 255, activeGames: ["Game1"] },
+    });
+    mockFetchGame.mockResolvedValueOnce({
+      address: "Game1",
+      data: gameData({ name: "New Game", admin: USER_ADDRESS as Address, mint: MINT_ADDRESS }),
+    });
+    mockFindAssociatedTokenPda.mockResolvedValueOnce(["Ata1", 254]);
+    const mockGetMultipleAccounts = vi.fn(() => ({ send: async () => ({ value: [null] }) }));
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: { getMultipleAccounts: mockGetMultipleAccounts },
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+
+    await expect(listMyMemberGames()).resolves.toEqual([
+      { address: "Game1", name: "New Game", mode: 0, balance: 0, isAdmin: true },
+    ]);
+  });
+
+  it("marks isAdmin true and uses the real balance for an admin who has also joined as a player", async () => {
+    mockFetchMaybeRegistry.mockResolvedValue({
+      exists: true,
+      address: REGISTRY_ADDRESS,
+      data: { discriminator: new Uint8Array(8), bump: 255, activeGames: ["Game1"] },
+    });
+    mockFetchGame.mockResolvedValueOnce({
+      address: "Game1",
+      data: gameData({ name: "Mixed", admin: USER_ADDRESS as Address, mint: MINT_ADDRESS }),
+    });
+    mockFindAssociatedTokenPda.mockResolvedValueOnce(["Ata1", 254]);
+    const mockGetMultipleAccounts = vi.fn(() => ({
+      send: async () => ({ value: [{ data: ["ZmFrZQ==", "base64"] }] }),
+    }));
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: { getMultipleAccounts: mockGetMultipleAccounts },
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockGetTokenDecoder.mockReturnValue({
+      decode: vi.fn().mockReturnValue({ amount: 400n }),
+    });
+
+    await expect(listMyMemberGames()).resolves.toEqual([
+      { address: "Game1", name: "Mixed", mode: 0, balance: 4, isAdmin: true },
+    ]);
+  });
+
+  it("returns multiple games mixing player, admin, and excluded games", async () => {
+    mockFetchMaybeRegistry.mockResolvedValue({
+      exists: true,
+      address: REGISTRY_ADDRESS,
+      data: { discriminator: new Uint8Array(8), bump: 255, activeGames: ["Game1", "Game2", "Game3"] },
+    });
+    mockFetchGame
+      .mockResolvedValueOnce({
+        address: "Game1",
+        data: gameData({
+          name: "Player game",
+          admin: "SomeoneElse11111111111111111111111111111" as Address,
+          mint: "Mint1111111111111111111111111111111111111" as Address,
+        }),
+      })
+      .mockResolvedValueOnce({
+        address: "Game2",
+        data: gameData({
+          name: "Admin game",
+          admin: USER_ADDRESS as Address,
+          mint: "Mint2222222222222222222222222222222222222" as Address,
+        }),
+      })
+      .mockResolvedValueOnce({
+        address: "Game3",
+        data: gameData({
+          name: "Not mine",
+          admin: "SomeoneElse11111111111111111111111111111" as Address,
+          mint: "Mint3333333333333333333333333333333333333" as Address,
+        }),
+      });
+    mockFindAssociatedTokenPda
+      .mockResolvedValueOnce(["Ata1", 254])
+      .mockResolvedValueOnce(["Ata2", 254])
+      .mockResolvedValueOnce(["Ata3", 254]);
+    const mockGetMultipleAccounts = vi.fn(() => ({
+      send: async () => ({ value: [{ data: ["ZmFrZQ==", "base64"] }, null, null] }),
+    }));
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: { getMultipleAccounts: mockGetMultipleAccounts },
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockGetTokenDecoder.mockReturnValue({
+      decode: vi.fn().mockReturnValue({ amount: 100n }),
+    });
+
+    await expect(listMyMemberGames()).resolves.toEqual([
+      { address: "Game1", name: "Player game", mode: 0, balance: 1, isAdmin: false },
+      { address: "Game2", name: "Admin game", mode: 0, balance: 0, isAdmin: true },
+    ]);
   });
 });
 
