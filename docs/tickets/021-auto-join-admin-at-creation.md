@@ -6,6 +6,9 @@
 
 **Status:** ready-for-agent
 
+**Spec:** [openspec/changes/auto-join-admin-at-creation/](../../openspec/changes/auto-join-admin-at-creation/)
+**Plan:** [docs/superpowers/plans/2026-08-09-auto-join-admin-at-creation.md](../superpowers/plans/2026-08-09-auto-join-admin-at-creation.md)
+
 - [ ] `create_game` creates the admin's ATA for the game's mint in the same instruction/transaction, reusing `join_game`'s (006) create-ATA logic, and increments `Game.player_count` to 1.
 - [ ] Creator sees themselves in the game's players list (with a zero balance) immediately after creation, with no separate join step.
 - [ ] Existing `create_game` behavior (registry insertion, name validation, mode, admin field) is unchanged — this only adds the auto-join side effect.
