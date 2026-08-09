@@ -31,7 +31,7 @@ TDD is expected: new code ships with tests for the happy path and 2+ edge cases 
 
 ## Planning & Implementation Workflow
 
-New feature/ticket work follows a three-layer planning pipeline (design → plan → openspec tracking) before implementation via `/autonomous-development-plugin:autonomous-feature-development`. Full workflow, artifact locations, and `plan_path`/`spec_path` wiring:
+New feature/ticket work follows a four-step planning workflow — (1) explore the codebase, specs, and docs related to the ticket, (2) run /grill-me to clarify anything undecided, (3) generate specs via openspec, (4) generate an implementation plan via superpowers — before implementation via `/autonomous-development-plugin:autonomous-feature-development`. Full workflow, artifact locations, and `plan_path`/`spec_path` wiring:
 
 @docs/technical-related/development-workflow/001-planning-and-implementation-workflow.md
 
