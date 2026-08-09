@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { joinGame, type BrowseGame } from "@/server/actions/game";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-
-function gameModeLabel(mode: BrowseGame["mode"]): string {
-  return mode === 0 ? "General Mode" : mode === 1 ? "Poker Mode" : "Pool Mode";
-}
+import { gameModeLabel } from "@/lib/game-mode";
 
 export default function BrowseGameRow({ game }: { game: BrowseGame }) {
   const router = useRouter();
