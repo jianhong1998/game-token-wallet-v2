@@ -5,15 +5,15 @@ Per-game on-chain state: a `Game` PDA and its own SPL mint, created by a logged-
 ## Requirements
 
 ### Requirement: Game creation
-The system SHALL allow a logged-in user to create a game with a name, defaulting to General Mode and public visibility, creating a per-game `Game` PDA (seeded `["game", game_id]`, where `game_id` is a client-generated UUID v7) and its own SPL mint (2 decimals, legacy SPL Token program, the `Game` PDA as mint authority, no freeze authority), signed and paid for by the system admin wallet.
+The system SHALL allow a logged-in user to create a game with a name, defaulting to General Mode and public visibility, creating a per-game `Game` PDA (seeded `["game", game_id]`, where `game_id` is a client-generated UUID v7) and its own SPL mint (2 decimals, legacy SPL Token program, the `Game` PDA as mint authority, no freeze authority), signed and paid for by the system admin wallet. In the same instruction, the system SHALL also create the creator's own Associated Token Account (ATA) for that mint, so the creator is immediately a player with a zero balance — no separate join step is required.
 
 #### Scenario: Successful creation
 - **WHEN** a logged-in user submits a valid game name
 - **THEN** the system creates the `Game` PDA and its mint on-chain, sets the creator as the game's admin, and appends the game's address to the `Registry`
 
-#### Scenario: Creator is admin, not automatically a player
+#### Scenario: Creator is admin and a player from creation
 - **WHEN** a game is created
-- **THEN** the creator is recorded as the game's admin, but is not added to any player list — joining as a player is a separate capability
+- **THEN** the creator is recorded as the game's admin, and the system creates the creator's own ATA for the game's mint with a zero balance and sets `Game.player_count` to 1 — the creator appears in the game's player list immediately, with no separate `join_game` call
 
 ### Requirement: Game admin identity
 The system SHALL identify a game's admin by the creator's `User` PDA address, not by a wallet keypair — there is no per-user wallet in this deployment's custodial model.
@@ -60,11 +60,11 @@ The system SHALL let a logged-in user view a list of the games they administer, 
 - **THEN** the system shows an empty state rather than an empty or missing list
 
 ### Requirement: Game player count
-The system SHALL track a `player_count` on each `Game` account, initialized to 0 at creation and incremented by one each time a player successfully joins. This count does not itself constitute a membership list — player membership remains tracked implicitly via each player's per-game Associated Token Account (ATA) existence/balance.
+The system SHALL track a `player_count` on each `Game` account, initialized to 1 at creation (the creator counts as the first player — see Game creation) and incremented by one each time a further player successfully joins. This count does not itself constitute a membership list — player membership remains tracked implicitly via each player's per-game Associated Token Account (ATA) existence/balance.
 
-#### Scenario: Count starts at zero
+#### Scenario: Count starts at one
 - **WHEN** a game is created
-- **THEN** its `player_count` is 0
+- **THEN** its `player_count` is 1, reflecting the creator's own auto-created ATA
 
 #### Scenario: Count increases as players join
 - **WHEN** a player successfully joins a game
