@@ -30,7 +30,7 @@ touches one of those areas.
 | 015 | Poker Mode: side pots                                                                     | 014, 013      | Pending |
 | 016 | General Pool Mode                                                                         | 008, 013      | Pending |
 | 017 | Frontend design foundation                                                                | 001           | Done    |
-| 018 | Home dashboard, nav, and account screen                                                   | 005, 006, 019 | Pending |
+| 018 | Home dashboard, nav, and account screen                                                   | 005, 006, 019 | Done    |
 | 019 | Remove no-op scaffolding; relocate dashboard to `/`                                       | 001, 003      | Done    |
 | 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Done    |
 | 021 | Auto-join admin as player at game creation                                               | 005, 006      | Pending |
@@ -100,5 +100,5 @@ graph TD
     classDef done stroke:#2ecc71,stroke-width:3px;
     classDef inProgress stroke:#f1c40f,stroke-width:3px;
 
-    class 001,002,003,005,006,017,019,020 done;
+    class 001,002,003,005,006,017,018,019,020 done;
 ```
