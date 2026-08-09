@@ -15,19 +15,17 @@ test.describe("game creation", () => {
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
+    await expect(page.getByTestId("home-empty")).toBeVisible();
 
-    await page.goto("/games");
-    await expect(page.getByTestId("games-empty")).toBeVisible();
-
-    await page.getByRole("link", { name: "New game" }).click();
+    await page.getByRole("link", { name: "Create" }).click();
     await expect(page).toHaveURL(/\/games\/new$/);
 
     await page.getByLabel("Game name").fill("Friday Poker");
     await page.getByRole("button", { name: "Create game" }).click();
 
-    await expect(page).toHaveURL(/\/games$/, { timeout: 30_000 });
-    await expect(page.getByTestId("games-list")).toContainText("Friday Poker");
-    await expect(page.getByTestId("games-list")).toContainText("Admin");
+    await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
+    await expect(page.getByTestId("home-games-list")).toContainText("Friday Poker");
+    await expect(page.getByTestId("home-games-list")).toContainText("Admin");
   });
 
   test("an invalid game name blocks submission with a live hint", async ({ page }) => {

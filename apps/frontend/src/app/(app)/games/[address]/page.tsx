@@ -1,10 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUsername } from "@/server/actions/auth";
-import { fetchGameDetail, type GameDetail } from "@/server/actions/game";
-
-function gameModeLabel(mode: GameDetail["mode"]): string {
-  return mode === 0 ? "General Mode" : mode === 1 ? "Poker Mode" : "Pool Mode";
-}
+import { fetchGameDetail } from "@/server/actions/game";
+import { gameModeLabel } from "@/lib/game-mode";
 
 export default async function GameDetailPage({
   params,

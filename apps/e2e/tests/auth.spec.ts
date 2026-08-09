@@ -16,8 +16,10 @@ test.describe("registration and login", () => {
     await page.getByRole("button", { name: "Create account" }).click();
 
     await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
-    await expect(page.getByTestId("home-welcome")).toContainText(username);
+    await expect(page.getByTestId("home-empty")).toBeVisible();
 
+    await page.goto("/account");
+    await expect(page.getByText(username)).toBeVisible();
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/login$/);
 
@@ -29,7 +31,8 @@ test.describe("registration and login", () => {
     await page.getByRole("button", { name: "Log in" }).click();
 
     await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
-    await expect(page.getByTestId("home-welcome")).toContainText(username);
+    await page.goto("/account");
+    await expect(page.getByText(username)).toBeVisible();
   });
 
   test("login with the wrong password shows a generic error", async ({ page }) => {
@@ -43,6 +46,7 @@ test.describe("registration and login", () => {
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
 
+    await page.goto("/account");
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/login$/);
 

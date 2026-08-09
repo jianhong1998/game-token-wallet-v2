@@ -75,33 +75,6 @@ export async function createGame(input: CreateGameInput): Promise<CreateGameResu
   return { ok: true };
 }
 
-export interface MyGame {
-  address: string;
-  name: string;
-}
-
-export async function listMyGames(): Promise<MyGame[]> {
-  const username = await getCurrentUsername();
-  if (!username) return [];
-
-  const { rpc, adminSigner, programAddress } = await getSolanaContext();
-  const [userAddress] = await findUserPda(
-    { username, admin: adminSigner.address },
-    { programAddress },
-  );
-  const [registryAddress] = await findRegistryPda({ programAddress });
-  const registry = await fetchMaybeRegistry(rpc, registryAddress);
-  if (!registry.exists) return [];
-
-  const games = await Promise.all(
-    registry.data.activeGames.map((gameAddress) => fetchGame(rpc, gameAddress)),
-  );
-
-  return games
-    .filter((game) => game.data.admin === userAddress)
-    .map((game) => ({ address: game.address, name: game.data.name }));
-}
-
 // Mirrors the on-chain `MAX_PLAYERS_PER_GAME` constant
 // (apps/on-chain-program/programs/game_token_wallet/src/state/game.rs) —
 // duplicated here only for a friendly pre-check; the on-chain `GameFull`
@@ -183,6 +156,42 @@ export async function joinGame(gameAddress: string): Promise<JoinGameResult> {
   return { ok: true };
 }
 
+// Shared fetch pipeline for both listBrowseGames and listMyMemberGames:
+// resolve the registry's active games, derive the caller's PDA, then
+// batch-fetch one ATA per game in a single getMultipleAccounts call.
+// Returns null when there's no signed-in user or the registry doesn't exist
+// yet, so callers can just `?? []` (or equivalent) at the call site.
+async function fetchGamesWithMyAtas(username: string) {
+  const { rpc, adminSigner, programAddress } = await getSolanaContext();
+  const [registryAddress] = await findRegistryPda({ programAddress });
+  const registry = await fetchMaybeRegistry(rpc, registryAddress);
+  if (!registry.exists) return null;
+
+  const games = await Promise.all(
+    registry.data.activeGames.map((gameAddress) => fetchGame(rpc, gameAddress)),
+  );
+
+  const [userAddress] = await findUserPda(
+    { username, admin: adminSigner.address },
+    { programAddress },
+  );
+  const atas = await Promise.all(
+    games.map(({ data }) =>
+      findAssociatedTokenPda({
+        owner: userAddress,
+        mint: data.mint,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      }),
+    ),
+  );
+  const ataAddresses = atas.map(([address]) => address);
+  const { value: ataAccounts } = ataAddresses.length
+    ? await rpc.getMultipleAccounts(ataAddresses).send()
+    : { value: [] as ({ data: [string, string] } | null)[] };
+
+  return { games, userAddress, ataAccounts };
+}
+
 export interface BrowseGame {
   address: string;
   name: string;
@@ -195,32 +204,9 @@ export async function listBrowseGames(): Promise<BrowseGame[]> {
   const username = await getCurrentUsername();
   if (!username) return [];
 
-  const { rpc, adminSigner, programAddress } = await getSolanaContext();
-  const [registryAddress] = await findRegistryPda({ programAddress });
-  const registry = await fetchMaybeRegistry(rpc, registryAddress);
-  if (!registry.exists) return [];
-
-  const games = await Promise.all(
-    registry.data.activeGames.map((gameAddress) => fetchGame(rpc, gameAddress)),
-  );
-
-  const [userAddress] = await findUserPda(
-    { username, admin: adminSigner.address },
-    { programAddress },
-  );
-  const playerAtas = await Promise.all(
-    games.map(({ data }) =>
-      findAssociatedTokenPda({
-        owner: userAddress,
-        mint: data.mint,
-        tokenProgram: TOKEN_PROGRAM_ADDRESS,
-      }),
-    ),
-  );
-  const ataAddresses = playerAtas.map(([address]) => address);
-  const { value: ataAccounts } = ataAddresses.length
-    ? await rpc.getMultipleAccounts(ataAddresses).send()
-    : { value: [] as (unknown | null)[] };
+  const result = await fetchGamesWithMyAtas(username);
+  if (!result) return [];
+  const { games, ataAccounts } = result;
 
   return games.map((game, index) => ({
     address: game.address,
@@ -229,6 +215,47 @@ export async function listBrowseGames(): Promise<BrowseGame[]> {
     playerCount: game.data.playerCount,
     isMember: ataAccounts[index] !== null,
   }));
+}
+
+export interface MemberGame {
+  address: string;
+  name: string;
+  mode: GameMode;
+  balance: number;
+  isAdmin: boolean;
+}
+
+export async function listMyMemberGames(): Promise<MemberGame[]> {
+  const username = await getCurrentUsername();
+  if (!username) return [];
+
+  const result = await fetchGamesWithMyAtas(username);
+  if (!result) return [];
+  const { games, userAddress, ataAccounts } = result;
+
+  const tokenDecoder = getTokenDecoder();
+
+  const memberGames: MemberGame[] = [];
+  games.forEach((game, index) => {
+    const isAdmin = game.data.admin === userAddress;
+    const ataAccount = ataAccounts[index];
+    const isPlayer = ataAccount !== null;
+    if (!isAdmin && !isPlayer) return;
+
+    const balance = ataAccount
+      ? Number(tokenDecoder.decode(Buffer.from(ataAccount.data[0], "base64")).amount) / 100
+      : 0;
+
+    memberGames.push({
+      address: game.address,
+      name: game.data.name,
+      mode: game.data.mode,
+      balance,
+      isAdmin,
+    });
+  });
+
+  return memberGames;
 }
 
 export interface GamePlayer {
