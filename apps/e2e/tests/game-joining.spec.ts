@@ -26,8 +26,8 @@ test("a second user can browse, join, and see themselves in the game's player li
   await page.goto("/games/new");
   await page.getByLabel("Game name").fill("E2E Join Test Game");
   await page.getByRole("button", { name: "Create game" }).click();
-  await expect(page).toHaveURL(/\/games$/, { timeout: 30_000 });
-  await expect(page.getByTestId("games-list")).toContainText("E2E Join Test Game");
+  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
+  await expect(page.getByTestId("home-games-list")).toContainText("E2E Join Test Game");
 
   // Join as a second, independent user (separate browser context so the
   // two sessions' cookies don't clash).
