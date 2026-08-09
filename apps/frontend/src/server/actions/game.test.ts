@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { MaybeAccount, Account, Address } from "@solana/kit";
-import type { Registry, Game } from "on-chain-client";
+import type { Address } from "@solana/kit";
+import type { Game } from "on-chain-client";
 
 const { mockGetSolanaContext } = vi.hoisted(() => ({ mockGetSolanaContext: vi.fn() }));
 vi.mock("../connection", () => ({ getSolanaContext: mockGetSolanaContext }));
@@ -75,14 +75,7 @@ const { mockSignAndSendTransaction } = vi.hoisted(() => ({
 }));
 vi.mock("../transaction", () => ({ signAndSendTransaction: mockSignAndSendTransaction }));
 
-import {
-  createGame,
-  listMyGames,
-  joinGame,
-  listBrowseGames,
-  listMyMemberGames,
-  fetchGameDetail,
-} from "./game";
+import { createGame, joinGame, listBrowseGames, listMyMemberGames, fetchGameDetail } from "./game";
 
 const ADMIN_ADDRESS = "Admin111111111111111111111111111111111111";
 const USER_ADDRESS = "User1111111111111111111111111111111111111";
@@ -153,64 +146,6 @@ describe("createGame", () => {
       { programAddress: PROGRAM_ADDRESS },
     );
     expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("listMyGames", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetCurrentUsername.mockResolvedValue("alice");
-    mockGetSolanaContext.mockResolvedValue({
-      rpc: {},
-      rpcSubscriptions: {},
-      adminSigner: { address: ADMIN_ADDRESS },
-      programAddress: PROGRAM_ADDRESS,
-    });
-    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
-    mockFindRegistryPda.mockResolvedValue([REGISTRY_ADDRESS, 255]);
-  });
-
-  it("returns an empty list when not signed in", async () => {
-    mockGetCurrentUsername.mockResolvedValue(null);
-    await expect(listMyGames()).resolves.toEqual([]);
-    expect(mockGetSolanaContext).not.toHaveBeenCalled();
-  });
-
-  it("returns an empty list when the registry doesn't exist yet", async () => {
-    mockFetchMaybeRegistry.mockResolvedValue({ exists: false } as MaybeAccount<Registry>);
-    await expect(listMyGames()).resolves.toEqual([]);
-  });
-
-  it("returns only games admined by the current user", async () => {
-    mockFetchMaybeRegistry.mockResolvedValue({
-      exists: true,
-      address: REGISTRY_ADDRESS,
-      data: {
-        discriminator: new Uint8Array(8),
-        bump: 255,
-        activeGames: ["Game1", "Game2"] as Registry["activeGames"],
-      },
-      // Mock accounts only ever populate `address`/`data` — the remaining
-      // BaseAccount fields (executable, lamports, programAddress, space)
-      // are irrelevant to listMyGames() and TS won't structurally accept
-      // the partial shape as a MaybeAccount<Registry> without routing
-      // through `unknown` first (same tsc-suggested escape hatch as the
-      // other two casts below).
-    } as unknown as MaybeAccount<Registry>);
-    mockFetchGame
-      .mockResolvedValueOnce({
-        address: "Game1" as Address,
-        data: gameData({ admin: USER_ADDRESS as Address, name: "Mine" }),
-      } as unknown as Account<Game>)
-      .mockResolvedValueOnce({
-        address: "Game2" as Address,
-        data: gameData({
-          admin: "SomeoneElse11111111111111111111111111111" as Address,
-          name: "Not mine",
-        }),
-      } as unknown as Account<Game>);
-
-    await expect(listMyGames()).resolves.toEqual([{ address: "Game1", name: "Mine" }]);
   });
 });
 

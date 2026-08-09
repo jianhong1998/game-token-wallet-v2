@@ -75,33 +75,6 @@ export async function createGame(input: CreateGameInput): Promise<CreateGameResu
   return { ok: true };
 }
 
-export interface MyGame {
-  address: string;
-  name: string;
-}
-
-export async function listMyGames(): Promise<MyGame[]> {
-  const username = await getCurrentUsername();
-  if (!username) return [];
-
-  const { rpc, adminSigner, programAddress } = await getSolanaContext();
-  const [userAddress] = await findUserPda(
-    { username, admin: adminSigner.address },
-    { programAddress },
-  );
-  const [registryAddress] = await findRegistryPda({ programAddress });
-  const registry = await fetchMaybeRegistry(rpc, registryAddress);
-  if (!registry.exists) return [];
-
-  const games = await Promise.all(
-    registry.data.activeGames.map((gameAddress) => fetchGame(rpc, gameAddress)),
-  );
-
-  return games
-    .filter((game) => game.data.admin === userAddress)
-    .map((game) => ({ address: game.address, name: game.data.name }));
-}
-
 // Mirrors the on-chain `MAX_PLAYERS_PER_GAME` constant
 // (apps/on-chain-program/programs/game_token_wallet/src/state/game.rs) —
 // duplicated here only for a friendly pre-check; the on-chain `GameFull`
