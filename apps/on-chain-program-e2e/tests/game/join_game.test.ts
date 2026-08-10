@@ -149,7 +149,9 @@ describe("join_game instruction", () => {
     const { gameAddress, id } = await createdGame(rpc, rpcSubscriptions, "joinhost1", 101);
 
     const gameBefore = await fetchGame(rpc, gameAddress);
-    expect(gameBefore.data.playerCount).toBe(0);
+    // The creator auto-joins as a player in create_game (ticket 021), so
+    // player_count starts at 1 (the creator), not 0.
+    expect(gameBefore.data.playerCount).toBe(1);
 
     const playerAdmin = await registeredAdmin(rpc, rpcSubscriptions, "joiner1");
     const { findUserPda } = await import("on-chain-client");
@@ -172,7 +174,8 @@ describe("join_game instruction", () => {
     expect(token.data.amount).toBe(0n);
 
     const gameAfter = await fetchGame(rpc, gameAddress);
-    expect(gameAfter.data.playerCount).toBe(1);
+    // 1 (creator, auto-joined at creation) + 1 (this joiner).
+    expect(gameAfter.data.playerCount).toBe(2);
   }, 30_000);
 
   it("rejects a second join by the same player with AlreadyJoinedGame", async () => {
@@ -228,7 +231,9 @@ describe("join_game instruction", () => {
     }
 
     const gameAfter = await fetchGame(rpc, gameAddress);
-    expect(gameAfter.data.playerCount).toBe(1);
+    // 1 (creator, auto-joined at creation) + 1 (this joiner, still counted
+    // once even though its second join attempt was rejected).
+    expect(gameAfter.data.playerCount).toBe(2);
   }, 30_000);
 
   it("rejects the 21st join with GameFull, leaving player_count at 20", async () => {
@@ -237,7 +242,10 @@ describe("join_game instruction", () => {
     const { gameAddress, id } = await createdGame(rpc, rpcSubscriptions, "joinhost3", 103);
     const game = await fetchGame(rpc, gameAddress);
 
-    for (let i = 0; i < 20; i += 1) {
+    // The creator already occupies 1 of the MAX_PLAYERS_PER_GAME (20) slots
+    // (auto-joined at creation, ticket 021), so only 19 additional joins fit
+    // before the game is full at 20 total players.
+    for (let i = 0; i < 19; i += 1) {
       await joinAsNewUser(rpc, rpcSubscriptions, id, game.data.mint, `capjoiner${i}`);
     }
 

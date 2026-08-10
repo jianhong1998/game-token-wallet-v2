@@ -20,11 +20,12 @@ import {
   type SolanaRpcApi,
   type SolanaRpcSubscriptionsApi,
 } from "@solana/kit";
-import { fetchMint } from "@solana-program/token";
+import { fetchMint, fetchToken, findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import {
   getCreateUserInstructionAsync,
   getCreateGameInstructionAsync,
   findGamePda,
+  findUserPda,
   fetchGame,
   findRegistryPda,
   fetchRegistry,
@@ -149,6 +150,18 @@ describe("create_game instruction", () => {
     const mint = await fetchMint(rpc, game.data.mint);
     expect(mint.data.decimals).toBe(2);
     expect(mint.data.mintAuthority).toEqual({ __option: "Some", value: gameAddress });
+
+    expect(game.data.playerCount).toBe(1);
+
+    const [userAddress] = await findUserPda({ username: "gamehost1", admin: admin.address });
+    const [playerAta] = await findAssociatedTokenPda({
+      owner: userAddress,
+      mint: game.data.mint,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    });
+    const token = await fetchToken(rpc, playerAta);
+    expect(token.data.owner).toBe(userAddress);
+    expect(token.data.amount).toBe(0n);
   }, 30_000);
 
   it("rejects a game name shorter than 3 bytes with InvalidGameNameLength", async () => {

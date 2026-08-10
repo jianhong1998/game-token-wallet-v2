@@ -12,8 +12,10 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
+  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
   getU32Decoder,
@@ -65,8 +67,11 @@ export type CreateGameInstruction<
   TAccountRegistry extends string | AccountMeta<string> = string,
   TAccountGame extends string | AccountMeta<string> = string,
   TAccountMint extends string | AccountMeta<string> = string,
+  TAccountPlayerAta extends string | AccountMeta<string> = string,
   TAccountTokenProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -90,9 +95,15 @@ export type CreateGameInstruction<
       TAccountMint extends string
         ? WritableAccount<TAccountMint>
         : TAccountMint,
+      TAccountPlayerAta extends string
+        ? WritableAccount<TAccountPlayerAta>
+        : TAccountPlayerAta,
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
         : TAccountTokenProgram,
+      TAccountAssociatedTokenProgram extends string
+        ? ReadonlyAccount<TAccountAssociatedTokenProgram>
+        : TAccountAssociatedTokenProgram,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -150,7 +161,9 @@ export type CreateGameAsyncInput<
   TAccountRegistry extends string = string,
   TAccountGame extends string = string,
   TAccountMint extends string = string,
+  TAccountPlayerAta extends string = string,
   TAccountTokenProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   admin: TransactionSigner<TAccountAdmin>;
@@ -158,7 +171,9 @@ export type CreateGameAsyncInput<
   registry?: Address<TAccountRegistry>;
   game?: Address<TAccountGame>;
   mint?: Address<TAccountMint>;
+  playerAta?: Address<TAccountPlayerAta>;
   tokenProgram?: Address<TAccountTokenProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   gameId: CreateGameInstructionDataArgs["gameId"];
   name: CreateGameInstructionDataArgs["name"];
@@ -171,7 +186,9 @@ export async function getCreateGameInstructionAsync<
   TAccountRegistry extends string,
   TAccountGame extends string,
   TAccountMint extends string,
+  TAccountPlayerAta extends string,
   TAccountTokenProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof GAME_TOKEN_WALLET_PROGRAM_ADDRESS,
 >(
@@ -181,7 +198,9 @@ export async function getCreateGameInstructionAsync<
     TAccountRegistry,
     TAccountGame,
     TAccountMint,
+    TAccountPlayerAta,
     TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -193,7 +212,9 @@ export async function getCreateGameInstructionAsync<
     TAccountRegistry,
     TAccountGame,
     TAccountMint,
+    TAccountPlayerAta,
     TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
     TAccountSystemProgram
   >
 > {
@@ -208,7 +229,12 @@ export async function getCreateGameInstructionAsync<
     registry: { value: input.registry ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
     mint: { value: input.mint ?? null, isWritable: true },
+    playerAta: { value: input.playerAta ?? null, isWritable: true },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isWritable: false,
+    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -239,9 +265,30 @@ export async function getCreateGameInstructionAsync<
       game: expectAddress(accounts.game.value),
     });
   }
+  if (!accounts.playerAta.value) {
+    accounts.playerAta.value = await getProgramDerivedAddress({
+      programAddress:
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
+      seeds: [
+        getAddressEncoder().encode(expectAddress(accounts.user.value)),
+        getBytesEncoder().encode(
+          new Uint8Array([
+            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
+            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
+            126, 255, 0, 169,
+          ]),
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
+      ],
+    });
+  }
   if (!accounts.tokenProgram.value) {
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
+  }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
@@ -256,7 +303,9 @@ export async function getCreateGameInstructionAsync<
       getAccountMeta(accounts.registry),
       getAccountMeta(accounts.game),
       getAccountMeta(accounts.mint),
+      getAccountMeta(accounts.playerAta),
       getAccountMeta(accounts.tokenProgram),
+      getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.systemProgram),
     ],
     data: getCreateGameInstructionDataEncoder().encode(
@@ -270,7 +319,9 @@ export async function getCreateGameInstructionAsync<
     TAccountRegistry,
     TAccountGame,
     TAccountMint,
+    TAccountPlayerAta,
     TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
     TAccountSystemProgram
   >);
 }
@@ -281,7 +332,9 @@ export type CreateGameInput<
   TAccountRegistry extends string = string,
   TAccountGame extends string = string,
   TAccountMint extends string = string,
+  TAccountPlayerAta extends string = string,
   TAccountTokenProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   admin: TransactionSigner<TAccountAdmin>;
@@ -289,7 +342,9 @@ export type CreateGameInput<
   registry: Address<TAccountRegistry>;
   game: Address<TAccountGame>;
   mint: Address<TAccountMint>;
+  playerAta: Address<TAccountPlayerAta>;
   tokenProgram?: Address<TAccountTokenProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   gameId: CreateGameInstructionDataArgs["gameId"];
   name: CreateGameInstructionDataArgs["name"];
@@ -302,7 +357,9 @@ export function getCreateGameInstruction<
   TAccountRegistry extends string,
   TAccountGame extends string,
   TAccountMint extends string,
+  TAccountPlayerAta extends string,
   TAccountTokenProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof GAME_TOKEN_WALLET_PROGRAM_ADDRESS,
 >(
@@ -312,7 +369,9 @@ export function getCreateGameInstruction<
     TAccountRegistry,
     TAccountGame,
     TAccountMint,
+    TAccountPlayerAta,
     TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -323,7 +382,9 @@ export function getCreateGameInstruction<
   TAccountRegistry,
   TAccountGame,
   TAccountMint,
+  TAccountPlayerAta,
   TAccountTokenProgram,
+  TAccountAssociatedTokenProgram,
   TAccountSystemProgram
 > {
   // Program address.
@@ -337,7 +398,12 @@ export function getCreateGameInstruction<
     registry: { value: input.registry ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
     mint: { value: input.mint ?? null, isWritable: true },
+    playerAta: { value: input.playerAta ?? null, isWritable: true },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isWritable: false,
+    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -353,6 +419,10 @@ export function getCreateGameInstruction<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -366,7 +436,9 @@ export function getCreateGameInstruction<
       getAccountMeta(accounts.registry),
       getAccountMeta(accounts.game),
       getAccountMeta(accounts.mint),
+      getAccountMeta(accounts.playerAta),
       getAccountMeta(accounts.tokenProgram),
+      getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.systemProgram),
     ],
     data: getCreateGameInstructionDataEncoder().encode(
@@ -380,7 +452,9 @@ export function getCreateGameInstruction<
     TAccountRegistry,
     TAccountGame,
     TAccountMint,
+    TAccountPlayerAta,
     TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
     TAccountSystemProgram
   >);
 }
@@ -396,8 +470,10 @@ export type ParsedCreateGameInstruction<
     registry: TAccountMetas[2];
     game: TAccountMetas[3];
     mint: TAccountMetas[4];
-    tokenProgram: TAccountMetas[5];
-    systemProgram: TAccountMetas[6];
+    playerAta: TAccountMetas[5];
+    tokenProgram: TAccountMetas[6];
+    associatedTokenProgram: TAccountMetas[7];
+    systemProgram: TAccountMetas[8];
   };
   data: CreateGameInstructionData;
 };
@@ -410,7 +486,7 @@ export function parseCreateGameInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateGameInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 7) {
+  if (instruction.accounts.length < 9) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -428,7 +504,9 @@ export function parseCreateGameInstruction<
       registry: getNextAccount(),
       game: getNextAccount(),
       mint: getNextAccount(),
+      playerAta: getNextAccount(),
       tokenProgram: getNextAccount(),
+      associatedTokenProgram: getNextAccount(),
       systemProgram: getNextAccount(),
     },
     data: getCreateGameInstructionDataDecoder().decode(instruction.data),

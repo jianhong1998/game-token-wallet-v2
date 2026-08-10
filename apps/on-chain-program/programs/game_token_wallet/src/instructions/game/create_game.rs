@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token};
+use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::errors::ErrorCode;
 use crate::state::{
@@ -49,7 +50,25 @@ pub struct CreateGame<'info> {
     )]
     pub mint: Account<'info, Mint>,
 
+    // The creator's own player Associated Token Account for `mint`, created
+    // in this same instruction so the creator is a player (not just admin)
+    // immediately — no separate join_game call needed. Unlike join_game's
+    // player_ata (a manually-CPI'd UncheckedAccount, so a duplicate join
+    // can return the friendly AlreadyJoinedGame error instead of a raw CPI
+    // failure), `mint` above is always freshly created earlier in this same
+    // instruction, so this ATA can never already exist — Anchor's
+    // declarative `init` constraint gives the identical guarantee with no
+    // manual CPI or require! checks needed.
+    #[account(
+        init,
+        payer = admin,
+        associated_token::mint = mint,
+        associated_token::authority = user,
+    )]
+    pub player_ata: Account<'info, TokenAccount>,
+
     pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
@@ -87,10 +106,10 @@ pub fn handler(
     game.mode = GameMode::General;
     game.admin = ctx.accounts.user.key();
     game.mint = ctx.accounts.mint.key();
-    // Plan snippet referenced `ctx.accounts.creator_user`, but this file's
-    // account field is named `user` (see the struct's Codama-canonicalization
-    // comment above) — using the actual existing field, not the stale name.
-    game.player_count = 0;
+    // The creator's player_ata (above) is created in this same instruction,
+    // so player_count starts at 1, not 0 — no separate join_game call
+    // needed for the creator to count as a player.
+    game.player_count = 1;
     let game_key = game.key();
 
     ctx.accounts.registry.active_games.push(game_key);
