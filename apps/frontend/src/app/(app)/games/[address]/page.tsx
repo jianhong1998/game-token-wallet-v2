@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentUsername } from "@/server/actions/auth";
 import { fetchGameDetail } from "@/server/actions/game";
 import { gameModeLabel } from "@/lib/game-mode";
+import AdminControlsModal from "./AdminControlsModal";
 
 export default async function GameDetailPage({
   params,
@@ -71,6 +72,8 @@ export default async function GameDetailPage({
           ))}
         </ul>
       </div>
+
+      {game.isAdmin && <AdminControlsModal gameAddress={game.address} players={game.players} />}
     </main>
   );
 }
