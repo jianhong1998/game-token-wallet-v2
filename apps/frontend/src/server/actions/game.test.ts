@@ -736,6 +736,17 @@ describe("depositToPlayer", () => {
     expect(mockGetSolanaContext).not.toHaveBeenCalled();
   });
 
+  it("rejects an amount whose base-unit conversion exceeds u64::MAX (1e29), without throwing, before building the instruction", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 1e29,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount is too large" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+    expect(mockGetMintToPlayerInstructionAsync).not.toHaveBeenCalled();
+  });
+
   it("converts whole-token amount to base units and sends the transaction on success", async () => {
     await expect(
       depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),

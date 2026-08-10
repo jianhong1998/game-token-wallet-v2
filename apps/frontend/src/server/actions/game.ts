@@ -196,6 +196,16 @@ export async function depositToPlayer(
     return { ok: false, error: "Amount must be greater than zero" };
   }
 
+  // The on-chain `amount` field is a u64 (max 18446744073709551615). A value
+  // like 1e29 is a finite, positive JS number that survives both guards above
+  // but overflows u64 once converted to base units — without this check it
+  // reaches getMintToPlayerInstructionAsync's codec, which throws an uncaught
+  // SolanaError past the friendly-error boundary below (that try/catch only
+  // wraps signAndSendTransaction).
+  if (baseUnitsAmount > 18446744073709551615n) {
+    return { ok: false, error: "Amount is too large" };
+  }
+
   const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
 
   const game = await fetchMaybeGame(rpc, input.gameAddress as Address);
