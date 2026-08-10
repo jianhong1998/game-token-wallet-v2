@@ -26,6 +26,7 @@ import {
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
   GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN,
   GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+  GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
   type GameMode,
 } from "on-chain-client";
 import {
@@ -175,10 +176,25 @@ export async function depositToPlayer(
     return { ok: false, error: "Not signed in" };
   }
 
-  if (!(input.amount > 0)) {
+  // Reject non-positive/non-finite amounts BEFORE any BigInt/Math.round touches
+  // input.amount — NaN and +/-Infinity both crash `BigInt(Math.round(x))` with
+  // an uncaught RangeError, so this guard must run first. Checking
+  // `input.amount * 100` (not just input.amount) also catches values that are
+  // themselves finite but overflow to Infinity once scaled to base units
+  // (e.g. 1e307, Number.MAX_VALUE) — that scaled value is what actually flows
+  // into Math.round/BigInt below, so it's what must be guaranteed finite.
+  if (!(input.amount > 0) || !Number.isFinite(input.amount * 100)) {
     return { ok: false, error: "Amount must be greater than zero" };
   }
+
+  // Amounts are stored on-chain in base units (2 decimal places, i.e. cents).
+  // An amount that's positive but rounds to 0 base units (e.g. 0.001) would
+  // otherwise sail past the guard above and only fail on-chain with an
+  // unfriendly error — so a second guard checks the actual converted value.
   const baseUnitsAmount = BigInt(Math.round(input.amount * 100));
+  if (baseUnitsAmount <= 0n) {
+    return { ok: false, error: "Amount must be greater than zero" };
+  }
 
   const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
 
@@ -233,6 +249,15 @@ export async function depositToPlayer(
       )
     ) {
       return { ok: false, error: "That player hasn't joined this game" };
+    }
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
+      )
+    ) {
+      return { ok: false, error: "Amount must be greater than zero" };
     }
     throw error;
   }

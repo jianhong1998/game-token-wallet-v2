@@ -43,11 +43,13 @@ const {
   ALREADY_JOINED_GAME_CODE,
   NOT_GAME_ADMIN_CODE,
   PLAYER_NOT_IN_GAME_CODE,
+  INVALID_DEPOSIT_AMOUNT_CODE,
 } = vi.hoisted(() => ({
   GAME_FULL_CODE: 0x1774,
   ALREADY_JOINED_GAME_CODE: 0x1775,
   NOT_GAME_ADMIN_CODE: 0x1777,
   PLAYER_NOT_IN_GAME_CODE: 0x1778,
+  INVALID_DEPOSIT_AMOUNT_CODE: 0x1779,
 }));
 vi.mock("on-chain-client", () => ({
   findUserPda: mockFindUserPda,
@@ -64,6 +66,7 @@ vi.mock("on-chain-client", () => ({
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME: ALREADY_JOINED_GAME_CODE,
   GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN: NOT_GAME_ADMIN_CODE,
   GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME: PLAYER_NOT_IN_GAME_CODE,
+  GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT: INVALID_DEPOSIT_AMOUNT_CODE,
 }));
 
 const { mockFindAssociatedTokenPda, mockGetTokenDecoder } = vi.hoisted(() => ({
@@ -673,6 +676,66 @@ describe("depositToPlayer", () => {
     expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
   });
 
+  it("rejects a sub-cent amount that would round to 0 base units, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 0.001,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a NaN amount without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: NaN,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an Infinity amount without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: Infinity,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a -Infinity amount without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: -Infinity,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an amount whose base-unit conversion overflows to Infinity (1e307), without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 1e307,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects Number.MAX_VALUE, whose base-unit conversion overflows to Infinity, without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: Number.MAX_VALUE,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
   it("converts whole-token amount to base units and sends the transaction on success", async () => {
     await expect(
       depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
@@ -709,6 +772,16 @@ describe("depositToPlayer", () => {
     await expect(
       depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
     ).resolves.toEqual({ ok: false, error: "That player hasn't joined this game" });
+  });
+
+  it("maps an on-chain InvalidDepositAmount rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === INVALID_DEPOSIT_AMOUNT_CODE,
+    );
+    await expect(
+      depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).resolves.toEqual({ ok: false, error: "Amount must be greater than zero" });
   });
 
   it("re-throws an on-chain error that isn't a recognized mint_to_player program error", async () => {
