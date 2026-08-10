@@ -19,10 +19,14 @@ import {
   fetchMaybeGame,
   getCreateGameInstructionAsync,
   getJoinGameInstructionAsync,
+  getMintToPlayerInstructionAsync,
   fetchAllUser,
   isGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL,
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
+  GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN,
+  GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+  GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
   type GameMode,
 } from "on-chain-client";
 import {
@@ -149,6 +153,121 @@ export async function joinGame(gameAddress: string): Promise<JoinGameResult> {
       )
     ) {
       return { ok: false, error: "You are already a player in this game" };
+    }
+    throw error;
+  }
+
+  return { ok: true };
+}
+
+export interface DepositToPlayerInput {
+  gameAddress: string;
+  playerUsername: string;
+  amount: number;
+}
+
+export type DepositToPlayerResult = { ok: true } | { ok: false; error: string };
+
+export async function depositToPlayer(
+  input: DepositToPlayerInput,
+): Promise<DepositToPlayerResult> {
+  const username = await getCurrentUsername();
+  if (!username) {
+    return { ok: false, error: "Not signed in" };
+  }
+
+  // Reject non-positive/non-finite amounts BEFORE any BigInt/Math.round touches
+  // input.amount — NaN and +/-Infinity both crash `BigInt(Math.round(x))` with
+  // an uncaught RangeError, so this guard must run first. Checking
+  // `input.amount * 100` (not just input.amount) also catches values that are
+  // themselves finite but overflow to Infinity once scaled to base units
+  // (e.g. 1e307, Number.MAX_VALUE) — that scaled value is what actually flows
+  // into Math.round/BigInt below, so it's what must be guaranteed finite.
+  if (!(input.amount > 0) || !Number.isFinite(input.amount * 100)) {
+    return { ok: false, error: "Amount must be greater than zero" };
+  }
+
+  // Amounts are stored on-chain in base units (2 decimal places, i.e. cents).
+  // An amount that's positive but rounds to 0 base units (e.g. 0.001) would
+  // otherwise sail past the guard above and only fail on-chain with an
+  // unfriendly error — so a second guard checks the actual converted value.
+  const baseUnitsAmount = BigInt(Math.round(input.amount * 100));
+  if (baseUnitsAmount <= 0n) {
+    return { ok: false, error: "Amount must be greater than zero" };
+  }
+
+  // The on-chain `amount` field is a u64 (max 18446744073709551615). A value
+  // like 1e29 is a finite, positive JS number that survives both guards above
+  // but overflows u64 once converted to base units — without this check it
+  // reaches getMintToPlayerInstructionAsync's codec, which throws an uncaught
+  // SolanaError past the friendly-error boundary below (that try/catch only
+  // wraps signAndSendTransaction).
+  if (baseUnitsAmount > 18446744073709551615n) {
+    return { ok: false, error: "Amount is too large" };
+  }
+
+  const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
+
+  const game = await fetchMaybeGame(rpc, input.gameAddress as Address);
+  if (!game.exists) {
+    return { ok: false, error: "Game not found" };
+  }
+
+  const [playerUserAddress] = await findUserPda(
+    { username: input.playerUsername, admin: adminSigner.address },
+    { programAddress },
+  );
+  const [playerAta] = await findAssociatedTokenPda({
+    owner: playerUserAddress,
+    mint: game.data.mint,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  const mintToPlayerInstruction = await getMintToPlayerInstructionAsync(
+    {
+      admin: adminSigner,
+      username,
+      gameId: game.data.gameId,
+      playerUsername: input.playerUsername,
+      playerAta,
+      amount: baseUnitsAmount,
+    },
+    { programAddress },
+  );
+
+  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+  const transactionMessage = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(adminSigner, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+    (tx) => appendTransactionMessageInstructions([mintToPlayerInstruction], tx),
+  );
+  try {
+    await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+  } catch (error) {
+    const cause = unwrapSimulationError(error);
+    if (
+      isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN)
+    ) {
+      return { ok: false, error: "Only the game's admin can deposit tokens" };
+    }
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+      )
+    ) {
+      return { ok: false, error: "That player hasn't joined this game" };
+    }
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
+      )
+    ) {
+      return { ok: false, error: "Amount must be greater than zero" };
     }
     throw error;
   }

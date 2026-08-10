@@ -8,5 +8,6 @@
 
 export * from "./game";
 export * from "./mint";
+export * from "./playerUser";
 export * from "./registry";
 export * from "./user";

@@ -19,6 +19,10 @@ import {
   GAME_TOKEN_WALLET_ERROR__GAME_FULL,
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
   GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA,
+  getMintToPlayerInstructionAsync,
+  GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN,
+  GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+  GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
 } from "./index";
 
 describe("generated on-chain-client", () => {
@@ -55,5 +59,12 @@ describe("generated on-chain-client", () => {
     expect(typeof GAME_TOKEN_WALLET_ERROR__GAME_FULL).toBe("number");
     expect(typeof GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME).toBe("number");
     expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA).toBe("number");
+  });
+
+  it("exports a mint_to_player instruction builder and its error helpers", () => {
+    expect(typeof getMintToPlayerInstructionAsync).toBe("function");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN).toBe("number");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME).toBe("number");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT).toBe("number");
   });
 });

@@ -19,6 +19,7 @@ const {
   mockFetchMaybeGame,
   mockGetCreateGameInstructionAsync,
   mockGetJoinGameInstructionAsync,
+  mockGetMintToPlayerInstructionAsync,
   mockFetchAllUser,
   mockIsGameTokenWalletError,
 } = vi.hoisted(() => ({
@@ -29,16 +30,26 @@ const {
   mockFetchMaybeGame: vi.fn(),
   mockGetCreateGameInstructionAsync: vi.fn(),
   mockGetJoinGameInstructionAsync: vi.fn(),
+  mockGetMintToPlayerInstructionAsync: vi.fn(),
   mockFetchAllUser: vi.fn(),
   mockIsGameTokenWalletError: vi.fn(),
 }));
 // Mirrors on-chain-client's actual generated error codes (see
 // apps/on-chain-client/src/generated/errors/gameTokenWallet.ts) — only the
-// two codes joinGame() maps to friendly messages need real values here since
-// mockIsGameTokenWalletError compares against them directly.
-const { GAME_FULL_CODE, ALREADY_JOINED_GAME_CODE } = vi.hoisted(() => ({
+// codes joinGame()/depositToPlayer() map to friendly messages need real
+// values here since mockIsGameTokenWalletError compares against them directly.
+const {
+  GAME_FULL_CODE,
+  ALREADY_JOINED_GAME_CODE,
+  NOT_GAME_ADMIN_CODE,
+  PLAYER_NOT_IN_GAME_CODE,
+  INVALID_DEPOSIT_AMOUNT_CODE,
+} = vi.hoisted(() => ({
   GAME_FULL_CODE: 0x1774,
   ALREADY_JOINED_GAME_CODE: 0x1775,
+  NOT_GAME_ADMIN_CODE: 0x1777,
+  PLAYER_NOT_IN_GAME_CODE: 0x1778,
+  INVALID_DEPOSIT_AMOUNT_CODE: 0x1779,
 }));
 vi.mock("on-chain-client", () => ({
   findUserPda: mockFindUserPda,
@@ -48,10 +59,14 @@ vi.mock("on-chain-client", () => ({
   fetchMaybeGame: mockFetchMaybeGame,
   getCreateGameInstructionAsync: mockGetCreateGameInstructionAsync,
   getJoinGameInstructionAsync: mockGetJoinGameInstructionAsync,
+  getMintToPlayerInstructionAsync: mockGetMintToPlayerInstructionAsync,
   fetchAllUser: mockFetchAllUser,
   isGameTokenWalletError: mockIsGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL: GAME_FULL_CODE,
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME: ALREADY_JOINED_GAME_CODE,
+  GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN: NOT_GAME_ADMIN_CODE,
+  GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME: PLAYER_NOT_IN_GAME_CODE,
+  GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT: INVALID_DEPOSIT_AMOUNT_CODE,
 }));
 
 const { mockFindAssociatedTokenPda, mockGetTokenDecoder } = vi.hoisted(() => ({
@@ -75,7 +90,14 @@ const { mockSignAndSendTransaction } = vi.hoisted(() => ({
 }));
 vi.mock("../transaction", () => ({ signAndSendTransaction: mockSignAndSendTransaction }));
 
-import { createGame, joinGame, listBrowseGames, listMyMemberGames, fetchGameDetail } from "./game";
+import {
+  createGame,
+  joinGame,
+  depositToPlayer,
+  listBrowseGames,
+  listMyMemberGames,
+  fetchGameDetail,
+} from "./game";
 
 const ADMIN_ADDRESS = "Admin111111111111111111111111111111111111";
 const USER_ADDRESS = "User1111111111111111111111111111111111111";
@@ -582,5 +604,202 @@ describe("fetchGameDetail", () => {
         { username: "bob", balance: 1.5, isAdmin: false },
       ],
     });
+  });
+});
+
+describe("depositToPlayer", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("hostadmin");
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {
+        getLatestBlockhash: () => ({
+          send: async () => ({ value: { blockhash: "fake", lastValidBlockHeight: 1n } }),
+        }),
+      },
+      rpcSubscriptions: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeGame.mockResolvedValue({
+      exists: true,
+      address: GAME_ADDRESS,
+      data: gameData({ mint: MINT_ADDRESS }),
+    });
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+    mockFindAssociatedTokenPda.mockResolvedValue([PLAYER_ATA_ADDRESS, 254]);
+    mockGetMintToPlayerInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
+    mockIsGameTokenWalletError.mockReturnValue(false);
+  });
+
+  it("rejects when not signed in, without touching the chain", async () => {
+    mockGetCurrentUsername.mockResolvedValue(null);
+    await expect(
+      depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).resolves.toEqual({ ok: false, error: "Not signed in" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a zero amount before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 0,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a negative amount before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: -5,
+    });
+    expect(result.ok).toBe(false);
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the game doesn't exist", async () => {
+    mockFetchMaybeGame.mockResolvedValue({ exists: false });
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 5,
+    });
+    expect(result).toEqual({ ok: false, error: "Game not found" });
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a sub-cent amount that would round to 0 base units, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 0.001,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a NaN amount without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: NaN,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an Infinity amount without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: Infinity,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a -Infinity amount without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: -Infinity,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an amount whose base-unit conversion overflows to Infinity (1e307), without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 1e307,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects Number.MAX_VALUE, whose base-unit conversion overflows to Infinity, without throwing, before touching the chain", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: Number.MAX_VALUE,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount must be greater than zero" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an amount whose base-unit conversion exceeds u64::MAX (1e29), without throwing, before building the instruction", async () => {
+    const result = await depositToPlayer({
+      gameAddress: GAME_ADDRESS,
+      playerUsername: "bob",
+      amount: 1e29,
+    });
+    expect(result).toEqual({ ok: false, error: "Amount is too large" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+    expect(mockGetMintToPlayerInstructionAsync).not.toHaveBeenCalled();
+  });
+
+  it("converts whole-token amount to base units and sends the transaction on success", async () => {
+    await expect(
+      depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).resolves.toEqual({ ok: true });
+    expect(mockGetMintToPlayerInstructionAsync).toHaveBeenCalledWith(
+      {
+        admin: { address: ADMIN_ADDRESS },
+        username: "hostadmin",
+        gameId: expect.anything(),
+        playerUsername: "bob",
+        playerAta: PLAYER_ATA_ADDRESS,
+        amount: 500n,
+      },
+      { programAddress: PROGRAM_ADDRESS },
+    );
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps an on-chain NotGameAdmin rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === NOT_GAME_ADMIN_CODE,
+    );
+    await expect(
+      depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).resolves.toEqual({ ok: false, error: "Only the game's admin can deposit tokens" });
+  });
+
+  it("maps an on-chain PlayerNotInGame rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === PLAYER_NOT_IN_GAME_CODE,
+    );
+    await expect(
+      depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).resolves.toEqual({ ok: false, error: "That player hasn't joined this game" });
+  });
+
+  it("maps an on-chain InvalidDepositAmount rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === INVALID_DEPOSIT_AMOUNT_CODE,
+    );
+    await expect(
+      depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).resolves.toEqual({ ok: false, error: "Amount must be greater than zero" });
+  });
+
+  it("re-throws an on-chain error that isn't a recognized mint_to_player program error", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("network blip"));
+    mockIsGameTokenWalletError.mockReturnValue(false);
+    await expect(
+      depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).rejects.toThrow("network blip");
   });
 });

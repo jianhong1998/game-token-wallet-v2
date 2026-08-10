@@ -7,11 +7,16 @@ vi.mock("@/server/actions/auth", () => ({ getCurrentUsername: mockGetCurrentUser
 const { mockFetchGameDetail } = vi.hoisted(() => ({ mockFetchGameDetail: vi.fn() }));
 vi.mock("@/server/actions/game", () => ({ fetchGameDetail: mockFetchGameDetail }));
 
-const { mockRedirect, mockNotFound } = vi.hoisted(() => ({
+const { mockRedirect, mockNotFound, mockRefresh } = vi.hoisted(() => ({
   mockRedirect: vi.fn(),
   mockNotFound: vi.fn(),
+  mockRefresh: vi.fn(),
 }));
-vi.mock("next/navigation", () => ({ redirect: mockRedirect, notFound: mockNotFound }));
+vi.mock("next/navigation", () => ({
+  redirect: mockRedirect,
+  notFound: mockNotFound,
+  useRouter: () => ({ refresh: mockRefresh }),
+}));
 
 import GameDetailPage from "./page";
 
@@ -55,7 +60,7 @@ describe("GameDetailPage", () => {
     expect(screen.queryByText("Admin")).toBeInTheDocument();
   });
 
-  it("shows the admin badge in the header when the viewer is the game's admin", async () => {
+  it("shows the admin badge and the Admin controls button when the viewer is the game's admin", async () => {
     mockGetCurrentUsername.mockResolvedValue("alice");
     mockFetchGameDetail.mockResolvedValue({
       address: "Game1",
@@ -68,5 +73,24 @@ describe("GameDetailPage", () => {
     const jsx = await GameDetailPage({ params: Promise.resolve({ address: "Game1" }) });
     render(jsx);
     expect(screen.getByTestId("game-admin-badge")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Admin controls" })).toBeInTheDocument();
+  });
+
+  it("does not show the Admin controls button for a non-admin viewer", async () => {
+    mockGetCurrentUsername.mockResolvedValue("bob");
+    mockFetchGameDetail.mockResolvedValue({
+      address: "Game1",
+      name: "Friday Poker",
+      mode: 0,
+      isAdmin: false,
+      myBalance: 1.5,
+      players: [
+        { username: "alice", balance: 4, isAdmin: true },
+        { username: "bob", balance: 1.5, isAdmin: false },
+      ],
+    });
+    const jsx = await GameDetailPage({ params: Promise.resolve({ address: "Game1" }) });
+    render(jsx);
+    expect(screen.queryByRole("button", { name: "Admin controls" })).not.toBeInTheDocument();
   });
 });
