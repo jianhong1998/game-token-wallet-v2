@@ -10,3 +10,4 @@ export * from "./createGame";
 export * from "./createUser";
 export * from "./initializeRegistry";
 export * from "./joinGame";
+export * from "./mintToPlayer";

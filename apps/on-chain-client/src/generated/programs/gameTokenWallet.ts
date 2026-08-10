@@ -21,10 +21,12 @@ import {
   parseCreateUserInstruction,
   parseInitializeRegistryInstruction,
   parseJoinGameInstruction,
+  parseMintToPlayerInstruction,
   type ParsedCreateGameInstruction,
   type ParsedCreateUserInstruction,
   type ParsedInitializeRegistryInstruction,
   type ParsedJoinGameInstruction,
+  type ParsedMintToPlayerInstruction,
 } from "../instructions";
 
 export const GAME_TOKEN_WALLET_PROGRAM_ADDRESS =
@@ -83,6 +85,7 @@ export enum GameTokenWalletInstruction {
   CreateUser,
   InitializeRegistry,
   JoinGame,
+  MintToPlayer,
 }
 
 export function identifyGameTokenWalletInstruction(
@@ -133,6 +136,17 @@ export function identifyGameTokenWalletInstruction(
   ) {
     return GameTokenWalletInstruction.JoinGame;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([137, 49, 202, 132, 62, 0, 217, 29]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.MintToPlayer;
+  }
   throw new Error(
     "The provided instruction could not be identified as a gameTokenWallet instruction.",
   );
@@ -152,7 +166,10 @@ export type ParsedGameTokenWalletInstruction<
     } & ParsedInitializeRegistryInstruction<TProgram>)
   | ({
       instructionType: GameTokenWalletInstruction.JoinGame;
-    } & ParsedJoinGameInstruction<TProgram>);
+    } & ParsedJoinGameInstruction<TProgram>)
+  | ({
+      instructionType: GameTokenWalletInstruction.MintToPlayer;
+    } & ParsedMintToPlayerInstruction<TProgram>);
 
 export function parseGameTokenWalletInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
@@ -185,6 +202,13 @@ export function parseGameTokenWalletInstruction<TProgram extends string>(
       return {
         instructionType: GameTokenWalletInstruction.JoinGame,
         ...parseJoinGameInstruction(instruction),
+      };
+    }
+    case GameTokenWalletInstruction.MintToPlayer: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.MintToPlayer,
+        ...parseMintToPlayerInstruction(instruction),
       };
     }
     default:
