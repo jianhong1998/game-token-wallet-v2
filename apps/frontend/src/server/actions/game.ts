@@ -19,10 +19,13 @@ import {
   fetchMaybeGame,
   getCreateGameInstructionAsync,
   getJoinGameInstructionAsync,
+  getMintToPlayerInstructionAsync,
   fetchAllUser,
   isGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL,
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
+  GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN,
+  GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
   type GameMode,
 } from "on-chain-client";
 import {
@@ -149,6 +152,87 @@ export async function joinGame(gameAddress: string): Promise<JoinGameResult> {
       )
     ) {
       return { ok: false, error: "You are already a player in this game" };
+    }
+    throw error;
+  }
+
+  return { ok: true };
+}
+
+export interface DepositToPlayerInput {
+  gameAddress: string;
+  playerUsername: string;
+  amount: number;
+}
+
+export type DepositToPlayerResult = { ok: true } | { ok: false; error: string };
+
+export async function depositToPlayer(
+  input: DepositToPlayerInput,
+): Promise<DepositToPlayerResult> {
+  const username = await getCurrentUsername();
+  if (!username) {
+    return { ok: false, error: "Not signed in" };
+  }
+
+  if (!(input.amount > 0)) {
+    return { ok: false, error: "Amount must be greater than zero" };
+  }
+  const baseUnitsAmount = BigInt(Math.round(input.amount * 100));
+
+  const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
+
+  const game = await fetchMaybeGame(rpc, input.gameAddress as Address);
+  if (!game.exists) {
+    return { ok: false, error: "Game not found" };
+  }
+
+  const [playerUserAddress] = await findUserPda(
+    { username: input.playerUsername, admin: adminSigner.address },
+    { programAddress },
+  );
+  const [playerAta] = await findAssociatedTokenPda({
+    owner: playerUserAddress,
+    mint: game.data.mint,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  const mintToPlayerInstruction = await getMintToPlayerInstructionAsync(
+    {
+      admin: adminSigner,
+      username,
+      gameId: game.data.gameId,
+      playerUsername: input.playerUsername,
+      playerAta,
+      amount: baseUnitsAmount,
+    },
+    { programAddress },
+  );
+
+  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+  const transactionMessage = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(adminSigner, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+    (tx) => appendTransactionMessageInstructions([mintToPlayerInstruction], tx),
+  );
+  try {
+    await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+  } catch (error) {
+    const cause = unwrapSimulationError(error);
+    if (
+      isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN)
+    ) {
+      return { ok: false, error: "Only the game's admin can deposit tokens" };
+    }
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+      )
+    ) {
+      return { ok: false, error: "That player hasn't joined this game" };
     }
     throw error;
   }
