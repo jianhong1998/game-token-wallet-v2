@@ -41,4 +41,14 @@ pub mod game_token_wallet {
     pub fn join_game(ctx: Context<JoinGame>, game_id: [u8; 16], username: String) -> Result<()> {
         instructions::game::join_game::handler(ctx, game_id, username)
     }
+
+    pub fn mint_to_player(
+        ctx: Context<MintToPlayer>,
+        game_id: [u8; 16],
+        username: String,
+        player_username: String,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::game::mint_to_player::handler(ctx, game_id, username, player_username, amount)
+    }
 }
