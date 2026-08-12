@@ -42,7 +42,7 @@ test("a player sends tokens to two other members in one batch", async ({ page, b
     .filter({ hasText: "E2E Transfer Test Game" })
     .getByRole("button", { name: "Join" })
     .click();
-  await expect(senderPage).toHaveURL(/\/games\/.+/, { timeout: 30_000 });
+  await expect(senderPage).toHaveURL(/\/games\/(?!all\b)[\w-]+/, { timeout: 30_000 });
 
   const recipientContext = await browser.newContext();
   const recipientPage = await recipientContext.newPage();
@@ -53,7 +53,7 @@ test("a player sends tokens to two other members in one batch", async ({ page, b
     .filter({ hasText: "E2E Transfer Test Game" })
     .getByRole("button", { name: "Join" })
     .click();
-  await expect(recipientPage).toHaveURL(/\/games\/.+/, { timeout: 30_000 });
+  await expect(recipientPage).toHaveURL(/\/games\/(?!all\b)[\w-]+/, { timeout: 30_000 });
 
   // Host deposits so the sender has a balance to transfer from.
   await page.getByRole("link", { name: /E2E Transfer Test Game/ }).click();
