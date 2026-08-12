@@ -22,4 +22,8 @@ pub enum ErrorCode {
     PlayerNotInGame,
     #[msg("Deposit amount must be greater than zero")]
     InvalidDepositAmount,
+    #[msg("Cannot transfer tokens to yourself")]
+    SelfTransfer,
+    #[msg("Transfer amount must be greater than zero")]
+    InvalidTransferAmount,
 }
