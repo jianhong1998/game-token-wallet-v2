@@ -63,7 +63,7 @@ describe("SendTokensForm", () => {
     render(<SendTokensForm gameAddress="Game1" players={PLAYERS} currentUsername="alice" />);
     fireEvent.click(screen.getByRole("button", { name: "+ Add recipient" }));
     const pickers = screen.getAllByLabelText("Recipient");
-    const amounts = screen.getAllByLabelText("Amount");
+    const amounts = screen.getAllByLabelText("Tokens to send");
     fireEvent.change(pickers[0], { target: { value: "bob" } });
     fireEvent.change(amounts[0], { target: { value: "5" } });
     fireEvent.change(pickers[1], { target: { value: "carol" } });
@@ -89,7 +89,7 @@ describe("SendTokensForm", () => {
     });
     render(<SendTokensForm gameAddress="Game1" players={PLAYERS} currentUsername="alice" />);
     fireEvent.change(screen.getAllByLabelText("Recipient")[0], { target: { value: "bob" } });
-    fireEvent.change(screen.getAllByLabelText("Amount")[0], { target: { value: "5" } });
+    fireEvent.change(screen.getAllByLabelText("Tokens to send")[0], { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: /Send/ }));
 
     await waitFor(() =>
@@ -109,7 +109,7 @@ describe("SendTokensForm", () => {
     });
     render(<SendTokensForm gameAddress="Game1" players={PLAYERS} currentUsername="alice" />);
     fireEvent.change(screen.getAllByLabelText("Recipient")[0], { target: { value: "bob" } });
-    fireEvent.change(screen.getAllByLabelText("Amount")[0], { target: { value: "5" } });
+    fireEvent.change(screen.getAllByLabelText("Tokens to send")[0], { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: /Send/ }));
 
     await waitFor(() =>

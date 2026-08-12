@@ -110,7 +110,7 @@ export default function SendTokensForm({
               ))}
             </select>
             <Input
-              aria-label="Amount"
+              aria-label="Tokens to send"
               type="number"
               step="0.01"
               value={row.amount}

@@ -60,10 +60,9 @@ test("a player sends tokens to two other members in one batch", async ({ page, b
   await expect(page).toHaveURL(/\/games\/.+/, { timeout: 30_000 });
   await page.getByRole("button", { name: "Admin controls" }).click();
   await page.getByLabel("Player").selectOption(senderUsername);
-  // Scoped to the admin modal's own "Amount" field by id: the page also renders
-  // SendTokensForm's "Amount" field for this General Mode game (the host is a
-  // player too via ticket 021 auto-join), so a plain getByLabel("Amount") would
-  // match both and fail Playwright's strict-mode uniqueness check.
+  // Scoped to the admin modal's own "Amount" field by id (kept explicit even
+  // though SendTokensForm's own amount field now has a distinct "Tokens to
+  // send" label, avoiding any getByLabel("Amount") ambiguity).
   await page.locator("#deposit-amount").fill("10.00");
   await page.getByRole("button", { name: "Deposit" }).click();
   await expect(
@@ -71,8 +70,8 @@ test("a player sends tokens to two other members in one batch", async ({ page, b
   ).toContainText("10.00");
 
   // Sender opens the game and sends a batch to the host and the recipient.
-  // Fill the first row while it's the only one (so the "Recipient"/"Amount"
-  // labels are unambiguous), then add a second row and address it by index.
+  // Fill the first row while it's the only one (so the "Recipient"/"Tokens to
+  // send" labels are unambiguous), then add a second row and address it by index.
   await senderPage.reload();
   await expect(senderPage.getByTestId("my-balance")).toContainText("10.00");
   // exact: true — Playwright's getByLabel does case-insensitive substring
@@ -81,10 +80,10 @@ test("a player sends tokens to two other members in one batch", async ({ page, b
   // plain "Recipient" query too (same reasoning as registerAndLogin's
   // "Password" vs "Confirm password" above).
   await senderPage.getByLabel("Recipient", { exact: true }).selectOption(hostUsername);
-  await senderPage.getByLabel("Amount").fill("3.00");
+  await senderPage.getByLabel("Tokens to send").fill("3.00");
   await senderPage.getByRole("button", { name: "+ Add recipient" }).click();
   await senderPage.getByLabel("Recipient", { exact: true }).nth(1).selectOption(recipientUsername);
-  await senderPage.getByLabel("Amount").nth(1).fill("2.00");
+  await senderPage.getByLabel("Tokens to send").nth(1).fill("2.00");
   await senderPage.getByRole("button", { name: /Send/ }).click();
 
   await expect(senderPage.getByTestId("my-balance")).toContainText("5.00", { timeout: 30_000 });
