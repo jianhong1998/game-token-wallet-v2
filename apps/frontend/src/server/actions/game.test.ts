@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Address } from "@solana/kit";
+import { SolanaError, SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type Address } from "@solana/kit";
 import type { Game } from "on-chain-client";
 
 const { mockGetSolanaContext } = vi.hoisted(() => ({ mockGetSolanaContext: vi.fn() }));
@@ -79,19 +79,16 @@ vi.mock("on-chain-client", () => ({
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT: INVALID_TRANSFER_AMOUNT_CODE,
 }));
 
-const { mockFindAssociatedTokenPda, mockGetTokenDecoder, mockFetchMaybeToken, mockIsTokenError } =
-  vi.hoisted(() => ({
-    mockFindAssociatedTokenPda: vi.fn(),
-    mockGetTokenDecoder: vi.fn(),
-    mockFetchMaybeToken: vi.fn(),
-    mockIsTokenError: vi.fn(),
-  }));
+const { mockFindAssociatedTokenPda, mockGetTokenDecoder, mockFetchMaybeToken } = vi.hoisted(() => ({
+  mockFindAssociatedTokenPda: vi.fn(),
+  mockGetTokenDecoder: vi.fn(),
+  mockFetchMaybeToken: vi.fn(),
+}));
 const { TOKEN_INSUFFICIENT_FUNDS_CODE } = vi.hoisted(() => ({ TOKEN_INSUFFICIENT_FUNDS_CODE: 1 }));
 vi.mock("@solana-program/token", () => ({
   findAssociatedTokenPda: mockFindAssociatedTokenPda,
   getTokenDecoder: mockGetTokenDecoder,
   fetchMaybeToken: mockFetchMaybeToken,
-  isTokenError: mockIsTokenError,
   TOKEN_ERROR__INSUFFICIENT_FUNDS: TOKEN_INSUFFICIENT_FUNDS_CODE,
   TOKEN_PROGRAM_ADDRESS: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 }));
@@ -855,7 +852,6 @@ describe("transferTokens", () => {
     mockChunkInstructionsBySize.mockImplementation((instructions: unknown[]) => [instructions]);
     mockSignAndSendTransaction.mockResolvedValue(undefined);
     mockIsGameTokenWalletError.mockReturnValue(false);
-    mockIsTokenError.mockReturnValue(false);
   });
 
   it("rejects when not signed in, without touching the chain", async () => {
@@ -1003,9 +999,13 @@ describe("transferTokens", () => {
     mockSignAndSendTransaction
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error("simulation failed"));
+      .mockRejectedValueOnce(
+        new SolanaError(SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, {
+          index: 0,
+          code: TOKEN_INSUFFICIENT_FUNDS_CODE,
+        }),
+      );
     mockIsGameTokenWalletError.mockReturnValue(false);
-    mockIsTokenError.mockImplementation((_error, _tx, code) => code === TOKEN_INSUFFICIENT_FUNDS_CODE);
 
     const result = await transferTokens({
       gameAddress: GAME_ADDRESS,
@@ -1077,7 +1077,6 @@ describe("transferTokens", () => {
   it("re-throws an on-chain error that isn't a recognized transfer_token or token program error", async () => {
     mockSignAndSendTransaction.mockRejectedValue(new Error("network blip"));
     mockIsGameTokenWalletError.mockReturnValue(false);
-    mockIsTokenError.mockReturnValue(false);
     await expect(
       transferTokens({ gameAddress: GAME_ADDRESS, recipients: [{ recipientUsername: "bob", amount: 5 }] }),
     ).rejects.toThrow("network blip");

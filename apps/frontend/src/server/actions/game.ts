@@ -8,6 +8,8 @@ import {
   appendTransactionMessageInstructions,
   fetchEncodedAccount,
   unwrapSimulationError,
+  isSolanaError,
+  SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
   type Address,
   type Base58EncodedBytes,
 } from "@solana/kit";
@@ -36,7 +38,6 @@ import {
   findAssociatedTokenPda,
   fetchMaybeToken,
   getTokenDecoder,
-  isTokenError,
   TOKEN_ERROR__INSUFFICIENT_FUNDS,
   TOKEN_PROGRAM_ADDRESS,
 } from "@solana-program/token";
@@ -443,7 +444,10 @@ export async function transferTokens(input: TransferTokensInput): Promise<Transf
         isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
       ) {
         friendly = "That player hasn't joined this game";
-      } else if (isTokenError(cause, transactionMessage, TOKEN_ERROR__INSUFFICIENT_FUNDS)) {
+      } else if (
+        isSolanaError(cause, SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM) &&
+        cause.context.code === TOKEN_ERROR__INSUFFICIENT_FUNDS
+      ) {
         friendly = "Not enough balance for this transfer";
       } else {
         throw error;
