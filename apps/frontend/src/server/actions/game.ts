@@ -20,6 +20,7 @@ import {
   getCreateGameInstructionAsync,
   getJoinGameInstructionAsync,
   getMintToPlayerInstructionAsync,
+  getTransferTokenInstructionAsync,
   fetchAllUser,
   isGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL,
@@ -27,17 +28,23 @@ import {
   GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN,
   GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
   GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
+  GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER,
+  GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
   type GameMode,
 } from "on-chain-client";
 import {
   findAssociatedTokenPda,
+  fetchMaybeToken,
   getTokenDecoder,
+  isTokenError,
+  TOKEN_ERROR__INSUFFICIENT_FUNDS,
   TOKEN_PROGRAM_ADDRESS,
 } from "@solana-program/token";
 import { normalizeGameName, validateGameName } from "@/lib/game-name";
 import { getSolanaContext } from "../connection";
 import { generateGameId } from "../game-id";
 import { signAndSendTransaction } from "../transaction";
+import { chunkInstructionsBySize } from "./transfer-chunking";
 import { getCurrentUsername } from "./auth";
 
 export interface CreateGameInput {
@@ -270,6 +277,180 @@ export async function depositToPlayer(
       return { ok: false, error: "Amount must be greater than zero" };
     }
     throw error;
+  }
+
+  return { ok: true };
+}
+
+export interface TransferRecipientInput {
+  recipientUsername: string;
+  amount: number;
+}
+
+export interface TransferTokensInput {
+  gameAddress: string;
+  recipients: TransferRecipientInput[];
+}
+
+export type TransferTokensResult =
+  | { ok: true }
+  | { ok: false; error: string; transfersApplied: number; transfersTotal: number };
+
+export async function transferTokens(input: TransferTokensInput): Promise<TransferTokensResult> {
+  const transfersTotal = input.recipients.length;
+  const username = await getCurrentUsername();
+  if (!username) {
+    return { ok: false, error: "Not signed in", transfersApplied: 0, transfersTotal };
+  }
+
+  if (transfersTotal === 0) {
+    return { ok: false, error: "Add at least one recipient", transfersApplied: 0, transfersTotal };
+  }
+
+  const seenRecipients = new Set<string>();
+  for (const recipient of input.recipients) {
+    if (seenRecipients.has(recipient.recipientUsername)) {
+      return {
+        ok: false,
+        error: `Duplicate recipient: ${recipient.recipientUsername}`,
+        transfersApplied: 0,
+        transfersTotal,
+      };
+    }
+    seenRecipients.add(recipient.recipientUsername);
+    if (recipient.recipientUsername === username) {
+      return {
+        ok: false,
+        error: "Cannot transfer tokens to yourself",
+        transfersApplied: 0,
+        transfersTotal,
+      };
+    }
+  }
+
+  // Same base-unit guards as depositToPlayer, applied per recipient: reject
+  // non-positive/non-finite amounts before BigInt/Math.round, then amounts
+  // that round to 0 base units, then amounts that overflow u64.
+  const baseUnitsAmounts: bigint[] = [];
+  for (const recipient of input.recipients) {
+    if (!(recipient.amount > 0) || !Number.isFinite(recipient.amount * 100)) {
+      return {
+        ok: false,
+        error: "Amount must be greater than zero",
+        transfersApplied: 0,
+        transfersTotal,
+      };
+    }
+    const baseUnits = BigInt(Math.round(recipient.amount * 100));
+    if (baseUnits <= 0n) {
+      return {
+        ok: false,
+        error: "Amount must be greater than zero",
+        transfersApplied: 0,
+        transfersTotal,
+      };
+    }
+    if (baseUnits > 18446744073709551615n) {
+      return { ok: false, error: "Amount is too large", transfersApplied: 0, transfersTotal };
+    }
+    baseUnitsAmounts.push(baseUnits);
+  }
+
+  const totalBaseUnits = baseUnitsAmounts.reduce((sum, amount) => sum + amount, 0n);
+
+  const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
+
+  const game = await fetchMaybeGame(rpc, input.gameAddress as Address);
+  if (!game.exists) {
+    return { ok: false, error: "Game not found", transfersApplied: 0, transfersTotal };
+  }
+
+  const [senderUserAddress] = await findUserPda(
+    { username, admin: adminSigner.address },
+    { programAddress },
+  );
+  const [senderAta] = await findAssociatedTokenPda({
+    owner: senderUserAddress,
+    mint: game.data.mint,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  // Best-effort pre-flight check against the sender's balance at request
+  // time — a concurrent transfer between this check and chunk execution can
+  // still make a later chunk fail; that's handled by the
+  // stop-on-first-failure send loop below, not by this check (see design.md
+  // decision 5).
+  const senderToken = await fetchMaybeToken(rpc, senderAta);
+  const senderBalance = senderToken.exists ? senderToken.data.amount : 0n;
+  if (senderBalance < totalBaseUnits) {
+    return {
+      ok: false,
+      error: "Not enough balance for this transfer",
+      transfersApplied: 0,
+      transfersTotal,
+    };
+  }
+
+  const instructions = await Promise.all(
+    input.recipients.map(async (recipient, index) => {
+      const [recipientUserAddress] = await findUserPda(
+        { username: recipient.recipientUsername, admin: adminSigner.address },
+        { programAddress },
+      );
+      const [recipientAta] = await findAssociatedTokenPda({
+        owner: recipientUserAddress,
+        mint: game.data.mint,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      });
+      return getTransferTokenInstructionAsync(
+        {
+          admin: adminSigner,
+          gameId: game.data.gameId,
+          senderUsername: username,
+          recipientUsername: recipient.recipientUsername,
+          senderAta,
+          recipientAta,
+          amount: baseUnitsAmounts[index],
+        },
+        { programAddress },
+      );
+    }),
+  );
+
+  const chunks = chunkInstructionsBySize(instructions, adminSigner.address);
+
+  let transfersApplied = 0;
+  for (const chunk of chunks) {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(adminSigner, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions(chunk, tx),
+    );
+    try {
+      await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+    } catch (error) {
+      const cause = unwrapSimulationError(error);
+      let friendly: string;
+      if (isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER)) {
+        friendly = "Cannot transfer tokens to yourself";
+      } else if (
+        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT)
+      ) {
+        friendly = "Amount must be greater than zero";
+      } else if (
+        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
+      ) {
+        friendly = "That player hasn't joined this game";
+      } else if (isTokenError(cause, transactionMessage, TOKEN_ERROR__INSUFFICIENT_FUNDS)) {
+        friendly = "Not enough balance for this transfer";
+      } else {
+        throw error;
+      }
+      return { ok: false, error: friendly, transfersApplied, transfersTotal };
+    }
+    transfersApplied += chunk.length;
   }
 
   return { ok: true };

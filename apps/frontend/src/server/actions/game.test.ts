@@ -20,6 +20,7 @@ const {
   mockGetCreateGameInstructionAsync,
   mockGetJoinGameInstructionAsync,
   mockGetMintToPlayerInstructionAsync,
+  mockGetTransferTokenInstructionAsync,
   mockFetchAllUser,
   mockIsGameTokenWalletError,
 } = vi.hoisted(() => ({
@@ -31,25 +32,31 @@ const {
   mockGetCreateGameInstructionAsync: vi.fn(),
   mockGetJoinGameInstructionAsync: vi.fn(),
   mockGetMintToPlayerInstructionAsync: vi.fn(),
+  mockGetTransferTokenInstructionAsync: vi.fn(),
   mockFetchAllUser: vi.fn(),
   mockIsGameTokenWalletError: vi.fn(),
 }));
 // Mirrors on-chain-client's actual generated error codes (see
 // apps/on-chain-client/src/generated/errors/gameTokenWallet.ts) — only the
-// codes joinGame()/depositToPlayer() map to friendly messages need real
-// values here since mockIsGameTokenWalletError compares against them directly.
+// codes joinGame()/depositToPlayer()/transferTokens() map to friendly
+// messages need real values here since mockIsGameTokenWalletError compares
+// against them directly.
 const {
   GAME_FULL_CODE,
   ALREADY_JOINED_GAME_CODE,
   NOT_GAME_ADMIN_CODE,
   PLAYER_NOT_IN_GAME_CODE,
   INVALID_DEPOSIT_AMOUNT_CODE,
+  SELF_TRANSFER_CODE,
+  INVALID_TRANSFER_AMOUNT_CODE,
 } = vi.hoisted(() => ({
   GAME_FULL_CODE: 0x1774,
   ALREADY_JOINED_GAME_CODE: 0x1775,
   NOT_GAME_ADMIN_CODE: 0x1777,
   PLAYER_NOT_IN_GAME_CODE: 0x1778,
   INVALID_DEPOSIT_AMOUNT_CODE: 0x1779,
+  SELF_TRANSFER_CODE: 0x177a,
+  INVALID_TRANSFER_AMOUNT_CODE: 0x177b,
 }));
 vi.mock("on-chain-client", () => ({
   findUserPda: mockFindUserPda,
@@ -60,6 +67,7 @@ vi.mock("on-chain-client", () => ({
   getCreateGameInstructionAsync: mockGetCreateGameInstructionAsync,
   getJoinGameInstructionAsync: mockGetJoinGameInstructionAsync,
   getMintToPlayerInstructionAsync: mockGetMintToPlayerInstructionAsync,
+  getTransferTokenInstructionAsync: mockGetTransferTokenInstructionAsync,
   fetchAllUser: mockFetchAllUser,
   isGameTokenWalletError: mockIsGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL: GAME_FULL_CODE,
@@ -67,17 +75,29 @@ vi.mock("on-chain-client", () => ({
   GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN: NOT_GAME_ADMIN_CODE,
   GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME: PLAYER_NOT_IN_GAME_CODE,
   GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT: INVALID_DEPOSIT_AMOUNT_CODE,
+  GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER: SELF_TRANSFER_CODE,
+  GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT: INVALID_TRANSFER_AMOUNT_CODE,
 }));
 
-const { mockFindAssociatedTokenPda, mockGetTokenDecoder } = vi.hoisted(() => ({
-  mockFindAssociatedTokenPda: vi.fn(),
-  mockGetTokenDecoder: vi.fn(),
-}));
+const { mockFindAssociatedTokenPda, mockGetTokenDecoder, mockFetchMaybeToken, mockIsTokenError } =
+  vi.hoisted(() => ({
+    mockFindAssociatedTokenPda: vi.fn(),
+    mockGetTokenDecoder: vi.fn(),
+    mockFetchMaybeToken: vi.fn(),
+    mockIsTokenError: vi.fn(),
+  }));
+const { TOKEN_INSUFFICIENT_FUNDS_CODE } = vi.hoisted(() => ({ TOKEN_INSUFFICIENT_FUNDS_CODE: 1 }));
 vi.mock("@solana-program/token", () => ({
   findAssociatedTokenPda: mockFindAssociatedTokenPda,
   getTokenDecoder: mockGetTokenDecoder,
+  fetchMaybeToken: mockFetchMaybeToken,
+  isTokenError: mockIsTokenError,
+  TOKEN_ERROR__INSUFFICIENT_FUNDS: TOKEN_INSUFFICIENT_FUNDS_CODE,
   TOKEN_PROGRAM_ADDRESS: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 }));
+
+const { mockChunkInstructionsBySize } = vi.hoisted(() => ({ mockChunkInstructionsBySize: vi.fn() }));
+vi.mock("./transfer-chunking", () => ({ chunkInstructionsBySize: mockChunkInstructionsBySize }));
 
 const { mockFetchEncodedAccount } = vi.hoisted(() => ({ mockFetchEncodedAccount: vi.fn() }));
 vi.mock("@solana/kit", async (importOriginal) => {
@@ -94,6 +114,7 @@ import {
   createGame,
   joinGame,
   depositToPlayer,
+  transferTokens,
   listBrowseGames,
   listMyMemberGames,
   fetchGameDetail,
@@ -800,6 +821,265 @@ describe("depositToPlayer", () => {
     mockIsGameTokenWalletError.mockReturnValue(false);
     await expect(
       depositToPlayer({ gameAddress: GAME_ADDRESS, playerUsername: "bob", amount: 5 }),
+    ).rejects.toThrow("network blip");
+  });
+});
+
+describe("transferTokens", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("alice");
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {
+        getLatestBlockhash: () => ({
+          send: async () => ({ value: { blockhash: "fake", lastValidBlockHeight: 1n } }),
+        }),
+      },
+      rpcSubscriptions: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeGame.mockResolvedValue({
+      exists: true,
+      address: GAME_ADDRESS,
+      data: gameData({ mint: MINT_ADDRESS }),
+    });
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+    mockFindAssociatedTokenPda.mockResolvedValue([PLAYER_ATA_ADDRESS, 254]);
+    mockFetchMaybeToken.mockResolvedValue({ exists: true, data: { amount: 100_000n } });
+    mockGetTransferTokenInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockChunkInstructionsBySize.mockImplementation((instructions: unknown[]) => [instructions]);
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
+    mockIsGameTokenWalletError.mockReturnValue(false);
+    mockIsTokenError.mockReturnValue(false);
+  });
+
+  it("rejects when not signed in, without touching the chain", async () => {
+    mockGetCurrentUsername.mockResolvedValue(null);
+    await expect(
+      transferTokens({ gameAddress: GAME_ADDRESS, recipients: [{ recipientUsername: "bob", amount: 5 }] }),
+    ).resolves.toEqual({ ok: false, error: "Not signed in", transfersApplied: 0, transfersTotal: 1 });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty recipient list before touching the chain", async () => {
+    await expect(transferTokens({ gameAddress: GAME_ADDRESS, recipients: [] })).resolves.toEqual({
+      ok: false,
+      error: "Add at least one recipient",
+      transfersApplied: 0,
+      transfersTotal: 0,
+    });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a duplicate recipient before touching the chain", async () => {
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [
+        { recipientUsername: "bob", amount: 5 },
+        { recipientUsername: "bob", amount: 3 },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a self-transfer before touching the chain", async () => {
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "alice", amount: 5 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Cannot transfer tokens to yourself",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a zero amount before touching the chain", async () => {
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 0 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Amount must be greater than zero",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an amount whose base-unit conversion exceeds u64::MAX, before touching the chain", async () => {
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 1e29 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Amount is too large",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the batch total exceeds the sender's balance, before sending any transaction", async () => {
+    mockFetchMaybeToken.mockResolvedValue({ exists: true, data: { amount: 400n } });
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 5 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Not enough balance for this transfer",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("treats a sender with no ATA yet as a zero balance", async () => {
+    mockFetchMaybeToken.mockResolvedValue({ exists: false });
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 5 }],
+    });
+    expect(result.ok).toBe(false);
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the game doesn't exist", async () => {
+    mockFetchMaybeGame.mockResolvedValue({ exists: false });
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 5 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Game not found",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("composes one instruction per recipient and sends a single chunk on success", async () => {
+    await expect(
+      transferTokens({
+        gameAddress: GAME_ADDRESS,
+        recipients: [
+          { recipientUsername: "bob", amount: 5 },
+          { recipientUsername: "carol", amount: 2.5 },
+        ],
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(mockGetTransferTokenInstructionAsync).toHaveBeenCalledTimes(2);
+    expect(mockGetTransferTokenInstructionAsync).toHaveBeenCalledWith(
+      {
+        admin: { address: ADMIN_ADDRESS },
+        gameId: expect.anything(),
+        senderUsername: "alice",
+        recipientUsername: "bob",
+        senderAta: PLAYER_ATA_ADDRESS,
+        recipientAta: PLAYER_ATA_ADDRESS,
+        amount: 500n,
+      },
+      { programAddress: PROGRAM_ADDRESS },
+    );
+    expect(mockChunkInstructionsBySize).toHaveBeenCalledTimes(1);
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends each chunk sequentially, stops at the first chunk failure, and reports transfersApplied", async () => {
+    mockChunkInstructionsBySize.mockReturnValue([["ix1"], ["ix2"], ["ix3"]]);
+    mockSignAndSendTransaction
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockReturnValue(false);
+    mockIsTokenError.mockImplementation((_error, _tx, code) => code === TOKEN_INSUFFICIENT_FUNDS_CODE);
+
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [
+        { recipientUsername: "bob", amount: 1 },
+        { recipientUsername: "carol", amount: 1 },
+        { recipientUsername: "dave", amount: 1 },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Not enough balance for this transfer",
+      transfersApplied: 2,
+      transfersTotal: 3,
+    });
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("maps an on-chain SelfTransfer rejection (bypassed client-side check) to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation((_error, _tx, code) => code === SELF_TRANSFER_CODE);
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 5 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Cannot transfer tokens to yourself",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+  });
+
+  it("maps an on-chain InvalidTransferAmount rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === INVALID_TRANSFER_AMOUNT_CODE,
+    );
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 5 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Amount must be greater than zero",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+  });
+
+  it("maps an on-chain PlayerNotInGame rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === PLAYER_NOT_IN_GAME_CODE,
+    );
+    const result = await transferTokens({
+      gameAddress: GAME_ADDRESS,
+      recipients: [{ recipientUsername: "bob", amount: 5 }],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "That player hasn't joined this game",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
+  });
+
+  it("re-throws an on-chain error that isn't a recognized transfer_token or token program error", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("network blip"));
+    mockIsGameTokenWalletError.mockReturnValue(false);
+    mockIsTokenError.mockReturnValue(false);
+    await expect(
+      transferTokens({ gameAddress: GAME_ADDRESS, recipients: [{ recipientUsername: "bob", amount: 5 }] }),
     ).rejects.toThrow("network blip");
   });
 });
