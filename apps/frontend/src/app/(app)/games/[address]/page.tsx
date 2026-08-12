@@ -1,8 +1,10 @@
 import { redirect, notFound } from "next/navigation";
+import { GameMode } from "on-chain-client";
 import { getCurrentUsername } from "@/server/actions/auth";
 import { fetchGameDetail } from "@/server/actions/game";
 import { gameModeLabel } from "@/lib/game-mode";
 import AdminControlsModal from "./AdminControlsModal";
+import SendTokensForm from "./SendTokensForm";
 
 export default async function GameDetailPage({
   params,
@@ -74,6 +76,14 @@ export default async function GameDetailPage({
       </div>
 
       {game.isAdmin && <AdminControlsModal gameAddress={game.address} players={game.players} />}
+
+      {game.mode === GameMode.General && (
+        <SendTokensForm
+          gameAddress={game.address}
+          players={game.players}
+          currentUsername={username}
+        />
+      )}
     </main>
   );
 }
