@@ -9,5 +9,7 @@
 export * from "./game";
 export * from "./mint";
 export * from "./playerUser";
+export * from "./recipient";
 export * from "./registry";
+export * from "./sender";
 export * from "./user";

@@ -34,6 +34,10 @@ export const GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN = 0x1777; // 6007
 export const GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME = 0x1778; // 6008
 /** InvalidDepositAmount: Deposit amount must be greater than zero */
 export const GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT = 0x1779; // 6009
+/** SelfTransfer: Cannot transfer tokens to yourself */
+export const GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER = 0x177a; // 6010
+/** InvalidTransferAmount: Transfer amount must be greater than zero */
+export const GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT = 0x177b; // 6011
 
 export type GameTokenWalletError =
   | typeof GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME
@@ -42,10 +46,12 @@ export type GameTokenWalletError =
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA
+  | typeof GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_USERNAME_LENGTH
   | typeof GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN
   | typeof GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME
-  | typeof GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL;
+  | typeof GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL
+  | typeof GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER;
 
 let gameTokenWalletErrorMessages:
   Record<GameTokenWalletError, string> | undefined;
@@ -57,10 +63,12 @@ if (process.env.NODE_ENV !== "production") {
     [GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS]: `Game name can only contain letters, numbers, and spaces`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH]: `Game name must be between 3 and 32 bytes`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA]: `Player token account address does not match the expected associated token account`,
+    [GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT]: `Transfer amount must be greater than zero`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_USERNAME_LENGTH]: `Username must be between 3 and 32 bytes`,
     [GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN]: `Only the game's admin can perform this action`,
     [GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME]: `Target user has not joined this game`,
     [GAME_TOKEN_WALLET_ERROR__REGISTRY_FULL]: `Registry is full`,
+    [GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER]: `Cannot transfer tokens to yourself`,
   };
 }
 

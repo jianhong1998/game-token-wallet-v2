@@ -23,6 +23,9 @@ import {
   GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN,
   GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
   GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
+  getTransferTokenInstructionAsync,
+  GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER,
+  GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
 } from "./index";
 
 describe("generated on-chain-client", () => {
@@ -66,5 +69,11 @@ describe("generated on-chain-client", () => {
     expect(typeof GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN).toBe("number");
     expect(typeof GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME).toBe("number");
     expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT).toBe("number");
+  });
+
+  it("exports a transfer_token instruction builder and its error helpers", () => {
+    expect(typeof getTransferTokenInstructionAsync).toBe("function");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER).toBe("number");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT).toBe("number");
   });
 });
