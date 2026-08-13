@@ -93,4 +93,38 @@ describe("GameDetailPage", () => {
     render(jsx);
     expect(screen.queryByRole("button", { name: "Admin controls" })).not.toBeInTheDocument();
   });
+
+  it("shows the Send tokens form for a General Mode game, for any member (not just the admin)", async () => {
+    mockGetCurrentUsername.mockResolvedValue("bob");
+    mockFetchGameDetail.mockResolvedValue({
+      address: "Game1",
+      name: "Friday Poker",
+      mode: 0,
+      isAdmin: false,
+      myBalance: 1.5,
+      players: [
+        { username: "alice", balance: 4, isAdmin: true },
+        { username: "bob", balance: 1.5, isAdmin: false },
+      ],
+    });
+    const jsx = await GameDetailPage({ params: Promise.resolve({ address: "Game1" }) });
+    render(jsx);
+    expect(screen.getByText("Send tokens")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient")).toBeInTheDocument();
+  });
+
+  it("hides the Send tokens form for a non-General-Mode game", async () => {
+    mockGetCurrentUsername.mockResolvedValue("bob");
+    mockFetchGameDetail.mockResolvedValue({
+      address: "Game1",
+      name: "Friday Hold'em",
+      mode: 1,
+      isAdmin: false,
+      myBalance: 1.5,
+      players: [{ username: "bob", balance: 1.5, isAdmin: false }],
+    });
+    const jsx = await GameDetailPage({ params: Promise.resolve({ address: "Game1" }) });
+    render(jsx);
+    expect(screen.queryByText("Send tokens")).not.toBeInTheDocument();
+  });
 });

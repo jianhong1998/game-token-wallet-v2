@@ -11,3 +11,4 @@ export * from "./createUser";
 export * from "./initializeRegistry";
 export * from "./joinGame";
 export * from "./mintToPlayer";
+export * from "./transferToken";

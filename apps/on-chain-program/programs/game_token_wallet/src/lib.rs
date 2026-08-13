@@ -51,4 +51,20 @@ pub mod game_token_wallet {
     ) -> Result<()> {
         instructions::game::mint_to_player::handler(ctx, game_id, username, player_username, amount)
     }
+
+    pub fn transfer_token(
+        ctx: Context<TransferToken>,
+        game_id: [u8; 16],
+        sender_username: String,
+        recipient_username: String,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::general_mode::transfer_token::handler(
+            ctx,
+            game_id,
+            sender_username,
+            recipient_username,
+            amount,
+        )
+    }
 }

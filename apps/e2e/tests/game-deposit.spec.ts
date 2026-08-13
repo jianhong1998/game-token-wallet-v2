@@ -33,7 +33,7 @@ test("game admin deposits to a player, and the player sees the credited balance"
   await secondPage.goto("/games/all");
   const row = secondPage.locator("li").filter({ hasText: "E2E Deposit Test Game" });
   await row.getByRole("button", { name: "Join" }).click();
-  await expect(secondPage).toHaveURL(/\/games\/.+/, { timeout: 30_000 });
+  await expect(secondPage).toHaveURL(/\/games\/(?!all\b)[\w-]+/, { timeout: 30_000 });
   await expect(secondPage.getByTestId("my-balance")).toContainText("0.00");
 
   // Non-admin has no access to the deposit form.

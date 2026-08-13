@@ -42,7 +42,7 @@ test("a second user can browse, join, and see themselves in the game's player li
   await expect(row).toContainText("1/20");
   await row.getByRole("button", { name: "Join" }).click();
 
-  await expect(secondPage).toHaveURL(/\/games\/.+/, { timeout: 30_000 });
+  await expect(secondPage).toHaveURL(/\/games\/(?!all\b)[\w-]+/, { timeout: 30_000 });
   await expect(secondPage.getByTestId("players-list")).toContainText(joinerUsername);
   await expect(secondPage.getByTestId("my-balance")).toContainText("0.00");
 

@@ -22,11 +22,13 @@ import {
   parseInitializeRegistryInstruction,
   parseJoinGameInstruction,
   parseMintToPlayerInstruction,
+  parseTransferTokenInstruction,
   type ParsedCreateGameInstruction,
   type ParsedCreateUserInstruction,
   type ParsedInitializeRegistryInstruction,
   type ParsedJoinGameInstruction,
   type ParsedMintToPlayerInstruction,
+  type ParsedTransferTokenInstruction,
 } from "../instructions";
 
 export const GAME_TOKEN_WALLET_PROGRAM_ADDRESS =
@@ -86,6 +88,7 @@ export enum GameTokenWalletInstruction {
   InitializeRegistry,
   JoinGame,
   MintToPlayer,
+  TransferToken,
 }
 
 export function identifyGameTokenWalletInstruction(
@@ -147,6 +150,17 @@ export function identifyGameTokenWalletInstruction(
   ) {
     return GameTokenWalletInstruction.MintToPlayer;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([219, 17, 122, 53, 237, 171, 232, 222]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.TransferToken;
+  }
   throw new Error(
     "The provided instruction could not be identified as a gameTokenWallet instruction.",
   );
@@ -169,7 +183,10 @@ export type ParsedGameTokenWalletInstruction<
     } & ParsedJoinGameInstruction<TProgram>)
   | ({
       instructionType: GameTokenWalletInstruction.MintToPlayer;
-    } & ParsedMintToPlayerInstruction<TProgram>);
+    } & ParsedMintToPlayerInstruction<TProgram>)
+  | ({
+      instructionType: GameTokenWalletInstruction.TransferToken;
+    } & ParsedTransferTokenInstruction<TProgram>);
 
 export function parseGameTokenWalletInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
@@ -209,6 +226,13 @@ export function parseGameTokenWalletInstruction<TProgram extends string>(
       return {
         instructionType: GameTokenWalletInstruction.MintToPlayer,
         ...parseMintToPlayerInstruction(instruction),
+      };
+    }
+    case GameTokenWalletInstruction.TransferToken: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.TransferToken,
+        ...parseTransferTokenInstruction(instruction),
       };
     }
     default:
