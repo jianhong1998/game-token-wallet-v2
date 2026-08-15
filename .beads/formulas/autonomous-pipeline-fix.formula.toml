@@ -1,0 +1,14 @@
+formula = "autonomous-pipeline-fix"
+description = "Single-step, reusable formula representing one fix-<issue-id> child of a ticket's verify_review_loop. Bonded individually per actionable review finding, e.g.: bd mol bond autonomous-pipeline-fix <ticket>.pipeline.verify_review_loop --ref iter-N-fix-M --var finding_summary=... The number of bonds issued equals the number of actionable findings in that review round, not a count fixed by this formula."
+version = 1
+type = "workflow"
+
+[vars.finding_summary]
+description = "One-line summary of the actionable review finding being fixed"
+required = true
+
+[[steps]]
+id = "root"
+title = "Fix: {{finding_summary}}"
+description = "Mirrors one actionable finding from a stage-review-fix.md review round. Closed once the finding is addressed and re-verified in the same iteration."
+type = "task"

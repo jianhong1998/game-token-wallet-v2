@@ -55,3 +55,8 @@ Do NOT say "done", "fixed", "verified", or "works" without that evidence in hand
 ## Compaction
 
 When compacting, preserve: modified file list, failing test/lint output, the current plan, and any decisions made explicitly this session.
+
+## Beads Issue Tracker
+
+Refer to [Beads instruction](./docs/beads/instruction.md) for using of Beads as issue tracker.
+Refer to [Autonomous pipeline mirroring](./docs/beads/autonomous-pipeline-mirroring.md) for mirroring `autonomous-feature-development` pipeline progress onto a ticket's bd issue.

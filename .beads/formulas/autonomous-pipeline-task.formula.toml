@@ -1,0 +1,14 @@
+formula = "autonomous-pipeline-task"
+description = "Single-step, reusable formula representing one task-N child of a ticket's pipeline. Bonded individually per plan task, e.g.: bd mol bond autonomous-pipeline-task <ticket>.pipeline --ref task-N --var task_name=... The number of bonds issued equals the number of parsed '### Task N:' headings, not a count fixed by this formula."
+version = 1
+type = "workflow"
+
+[vars.task_name]
+description = "Name of the plan task, parsed from its '### Task N: <name>' heading"
+required = true
+
+[[steps]]
+id = "root"
+title = "Task: {{task_name}}"
+description = "Mirrors .loop-logs/<id>/tasks/<task-id>.json status transitions: pending -> open, in_progress -> in_progress, completed -> closed, failed -> failed:wip (with a bd comments add root-cause entry)."
+type = "task"

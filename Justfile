@@ -102,3 +102,12 @@ program-build:
 program-keys-sync:
   @cd ./apps/on-chain-program && \
     anchor keys sync
+
+[group: 'Beads']
+bd-up:
+  @pnpx beads-ui start --port 8000
+
+[group: 'Beads']
+bd-down:
+  @pnpx beads-ui stop && \
+    echo "Beads UI stopped."

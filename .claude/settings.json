@@ -1,8 +1,11 @@
 {
   "permissions": {
-    "defaultMode": "auto",
-    "deny": ["Read(**/.env)"]
+    "deny": ["Read(**/.env)"],
+    "defaultMode": "auto"
   },
   "model": "sonnet[1m]",
-  "effortLevel": "high"
+  "effortLevel": "high",
+  "enabledPlugins": {
+    "beads@beads-marketplace": true
+  }
 }

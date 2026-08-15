@@ -20,7 +20,7 @@ touches one of those areas.
 | 005 | Create game (General Mode, public)                                                        | 002, 003      | Done    |
 | 006 | Join game (public)                                                                        | 005           | Done    |
 | 007 | Private games (password-protected)                                                        | 005, 006      | Pending |
-| 008 | Deposit / mint to player                                                                  | 006           | Pending |
+| 008 | Deposit / mint to player                                                                  | 006           | Done    |
 | 009 | General Mode transfers                                                                    | 008           | Done    |
 | 010 | Game admin transfer                                                                       | 006           | Pending |
 | 011 | Quit game                                                                                 | 009           | Pending |

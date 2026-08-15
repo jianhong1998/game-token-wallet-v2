@@ -1,0 +1,17 @@
+formula = "autonomous-pipeline"
+description = "Skeleton bonded once per ticket to mirror the autonomous-feature-development pipeline's Stage 2/3 verify-review loop and Stage 4 finalize. task-N children are bonded separately (see autonomous-pipeline-task.formula.toml) under <ticket>.pipeline; fix-N children are bonded separately (see autonomous-pipeline-fix.formula.toml) under <ticket>.pipeline.verify_review_loop. No gate field here by design: a formula-declared gate would block verify_review_loop from ever closing on clean autonomous runs. No LoopSpec here by design: bd does not enforce until/max at runtime (see design.md Decision 1), so the orchestrator counts iterations itself via .loop-logs/."
+version = 1
+type = "workflow"
+
+[[steps]]
+id = "verify_review_loop"
+title = "Verify/review loop"
+description = "Mirrors stage-review-fix.md's capped verify<->review loop. Stays open/in_progress while the orchestrator iterates; set to closed when a review round finds zero actionable issues, or failed:wip if the orchestrator's own 5-iteration cap is exhausted. fix-<issue-id> children are bonded under this step per actionable finding."
+type = "task"
+
+[[steps]]
+id = "finalize"
+title = "Finalize"
+description = "Mirrors stage-final.md's terminal step. The orchestrator sets this step's own status to reflect Stage 4 completion after setting the epic's terminal status (pending-human-review:wip or failed:wip)."
+type = "task"
+needs = ["verify_review_loop"]

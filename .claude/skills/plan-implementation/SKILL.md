@@ -45,4 +45,4 @@ Explore → clarify → spec → plan, one ticket at a time. openspec owns the s
 6. **After implementation finishes** (all tasks implemented, verified, reviewed, committed):
    - Check off `openspec/changes/<feature>/tasks.md` to match what was actually done.
    - Run `openspec-sync-specs` (mid-flight) or `openspec-archive-change` (once the ticket is fully closed) to fold the change's delta specs into `openspec/specs/<capability>/spec.md`.
-   - Update the ticket's status and `docs/tickets/000-index.md`.
+   - Set the ticket's bd issue status to `pending-human-review` (clean run) or `failed` (any task or the review loop failed) — see [Autonomous pipeline mirroring](../../../docs/beads/autonomous-pipeline-mirroring.md) — and update `docs/tickets/000-index.md`.
