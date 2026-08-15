@@ -32,6 +32,7 @@ TDD is expected: new code ships with tests for the happy path and 2+ edge cases 
 ## Planning & Implementation Workflow
 
 New feature/ticket work is planned via the `plan-implementation` skill — run `/plan-implementation <path-to-ticket-file>`.
+Refer to UI design and the workflow in @docs/technical-related/ui-design/004-ui-sample/Kitty - Glass Vault.dc.html
 
 ## Critical Rules
 
