@@ -38,8 +38,11 @@ export const GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT = 0x1779; // 6009
 export const GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER = 0x177a; // 6010
 /** InvalidTransferAmount: Transfer amount must be greater than zero */
 export const GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT = 0x177b; // 6011
+/** AdminCannotQuitGame: The game's admin cannot quit their own game */
+export const GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME = 0x177c; // 6012
 
 export type GameTokenWalletError =
+  | typeof GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME
   | typeof GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME
   | typeof GAME_TOKEN_WALLET_ERROR__GAME_FULL
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT
@@ -57,6 +60,7 @@ let gameTokenWalletErrorMessages:
   Record<GameTokenWalletError, string> | undefined;
 if (process.env.NODE_ENV !== "production") {
   gameTokenWalletErrorMessages = {
+    [GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME]: `The game's admin cannot quit their own game`,
     [GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME]: `You are already a player in this game`,
     [GAME_TOKEN_WALLET_ERROR__GAME_FULL]: `Game already has the maximum of 20 players`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT]: `Deposit amount must be greater than zero`,

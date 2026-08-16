@@ -26,6 +26,8 @@ import {
   getTransferTokenInstructionAsync,
   GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER,
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
+  getQuitGameInstructionAsync,
+  GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME,
 } from "./index";
 
 describe("generated on-chain-client", () => {
@@ -75,5 +77,10 @@ describe("generated on-chain-client", () => {
     expect(typeof getTransferTokenInstructionAsync).toBe("function");
     expect(typeof GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER).toBe("number");
     expect(typeof GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT).toBe("number");
+  });
+
+  it("exports a quit_game instruction builder and its error helper", () => {
+    expect(typeof getQuitGameInstructionAsync).toBe("function");
+    expect(typeof GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME).toBe("number");
   });
 });

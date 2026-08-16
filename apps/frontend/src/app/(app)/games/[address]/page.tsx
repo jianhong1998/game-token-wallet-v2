@@ -5,6 +5,7 @@ import { fetchGameDetail } from "@/server/actions/game";
 import { gameModeLabel } from "@/lib/game-mode";
 import AdminControlsModal from "./AdminControlsModal";
 import SendTokensForm from "./SendTokensForm";
+import QuitGameButton from "./QuitGameButton";
 
 export default async function GameDetailPage({
   params,
@@ -84,6 +85,8 @@ export default async function GameDetailPage({
           currentUsername={username}
         />
       )}
+
+      {!game.isAdmin && <QuitGameButton gameAddress={game.address} />}
     </main>
   );
 }
