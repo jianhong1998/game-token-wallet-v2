@@ -23,7 +23,7 @@ touches one of those areas.
 | 008 | Deposit / mint to player                                                                  | 006           | Pending |
 | 009 | General Mode transfers                                                                    | 008           | Done    |
 | 010 | Game admin transfer                                                                       | 006           | Pending |
-| 011 | Quit game                                                                                 | 009           | Pending |
+| 011 | Quit game                                                                                 | 009           | Done    |
 | 012 | Delete user account                                                                       | 003, 011      | Pending |
 | 013 | Close game (General Mode)                                                                 | 002, 009      | Pending |
 | 014 | Poker Mode: single pot                                                                    | 006, 008      | Pending |
@@ -100,5 +100,5 @@ graph TD
     classDef done stroke:#2ecc71,stroke-width:3px;
     classDef inProgress stroke:#f1c40f,stroke-width:3px;
 
-    class 001,002,003,005,006,008,009,017,018,019,020,021 done;
+    class 001,002,003,005,006,008,009,011,017,018,019,020,021 done;
 ```
