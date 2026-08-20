@@ -21,6 +21,7 @@ const {
   mockGetJoinGameInstructionAsync,
   mockGetMintToPlayerInstructionAsync,
   mockGetTransferTokenInstructionAsync,
+  mockGetQuitGameInstructionAsync,
   mockFetchAllUser,
   mockIsGameTokenWalletError,
 } = vi.hoisted(() => ({
@@ -33,6 +34,7 @@ const {
   mockGetJoinGameInstructionAsync: vi.fn(),
   mockGetMintToPlayerInstructionAsync: vi.fn(),
   mockGetTransferTokenInstructionAsync: vi.fn(),
+  mockGetQuitGameInstructionAsync: vi.fn(),
   mockFetchAllUser: vi.fn(),
   mockIsGameTokenWalletError: vi.fn(),
 }));
@@ -49,6 +51,7 @@ const {
   INVALID_DEPOSIT_AMOUNT_CODE,
   SELF_TRANSFER_CODE,
   INVALID_TRANSFER_AMOUNT_CODE,
+  ADMIN_CANNOT_QUIT_GAME_CODE,
 } = vi.hoisted(() => ({
   GAME_FULL_CODE: 0x1774,
   ALREADY_JOINED_GAME_CODE: 0x1775,
@@ -57,6 +60,7 @@ const {
   INVALID_DEPOSIT_AMOUNT_CODE: 0x1779,
   SELF_TRANSFER_CODE: 0x177a,
   INVALID_TRANSFER_AMOUNT_CODE: 0x177b,
+  ADMIN_CANNOT_QUIT_GAME_CODE: 0x177c,
 }));
 vi.mock("on-chain-client", () => ({
   findUserPda: mockFindUserPda,
@@ -68,6 +72,7 @@ vi.mock("on-chain-client", () => ({
   getJoinGameInstructionAsync: mockGetJoinGameInstructionAsync,
   getMintToPlayerInstructionAsync: mockGetMintToPlayerInstructionAsync,
   getTransferTokenInstructionAsync: mockGetTransferTokenInstructionAsync,
+  getQuitGameInstructionAsync: mockGetQuitGameInstructionAsync,
   fetchAllUser: mockFetchAllUser,
   isGameTokenWalletError: mockIsGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL: GAME_FULL_CODE,
@@ -77,6 +82,7 @@ vi.mock("on-chain-client", () => ({
   GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT: INVALID_DEPOSIT_AMOUNT_CODE,
   GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER: SELF_TRANSFER_CODE,
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT: INVALID_TRANSFER_AMOUNT_CODE,
+  GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME: ADMIN_CANNOT_QUIT_GAME_CODE,
 }));
 
 const { mockFindAssociatedTokenPda, mockGetTokenDecoder, mockFetchMaybeToken } = vi.hoisted(() => ({
@@ -112,6 +118,7 @@ import {
   joinGame,
   depositToPlayer,
   transferTokens,
+  quitGame,
   listBrowseGames,
   listMyMemberGames,
   fetchGameDetail,
@@ -286,6 +293,13 @@ describe("joinGame", () => {
 
   it("joins and sends the transaction on success", async () => {
     await expect(joinGame(GAME_ADDRESS)).resolves.toEqual({ ok: true });
+    // The existing-ATA pre-check must read at "confirmed" commitment to match
+    // signAndSendTransaction's confirmation level — the RPC-wide default of
+    // "finalized" lags behind "confirmed" and can still see a just-closed ATA
+    // (from a quit) as existing, incorrectly rejecting an immediate rejoin.
+    expect(mockFetchEncodedAccount).toHaveBeenCalledWith(expect.anything(), PLAYER_ATA_ADDRESS, {
+      commitment: "confirmed",
+    });
     expect(mockGetJoinGameInstructionAsync).toHaveBeenCalledWith(
       {
         admin: { address: ADMIN_ADDRESS },
@@ -1080,5 +1094,93 @@ describe("transferTokens", () => {
     await expect(
       transferTokens({ gameAddress: GAME_ADDRESS, recipients: [{ recipientUsername: "bob", amount: 5 }] }),
     ).rejects.toThrow("network blip");
+  });
+});
+
+describe("quitGame", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("bob");
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {
+        getLatestBlockhash: () => ({
+          send: async () => ({ value: { blockhash: "fake", lastValidBlockHeight: 1n } }),
+        }),
+      },
+      rpcSubscriptions: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeGame.mockResolvedValue({
+      exists: true,
+      address: GAME_ADDRESS,
+      data: gameData({ mint: MINT_ADDRESS }),
+    });
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+    mockFindAssociatedTokenPda.mockResolvedValue([PLAYER_ATA_ADDRESS, 254]);
+    mockGetQuitGameInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
+    mockIsGameTokenWalletError.mockReturnValue(false);
+  });
+
+  it("rejects when not signed in, without touching the chain", async () => {
+    mockGetCurrentUsername.mockResolvedValue(null);
+    await expect(quitGame(GAME_ADDRESS)).resolves.toEqual({ ok: false, error: "Not signed in" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the game doesn't exist", async () => {
+    mockFetchMaybeGame.mockResolvedValue({ exists: false });
+    await expect(quitGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "Game not found",
+    });
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sends the quit transaction on success", async () => {
+    await expect(quitGame(GAME_ADDRESS)).resolves.toEqual({ ok: true });
+    expect(mockGetQuitGameInstructionAsync).toHaveBeenCalledWith(
+      {
+        admin: { address: ADMIN_ADDRESS },
+        username: "bob",
+        gameId: expect.anything(),
+        playerAta: PLAYER_ATA_ADDRESS,
+      },
+      { programAddress: PROGRAM_ADDRESS },
+    );
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps an on-chain AdminCannotQuitGame rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === ADMIN_CANNOT_QUIT_GAME_CODE,
+    );
+    await expect(quitGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "Transfer admin role to another player before quitting",
+    });
+  });
+
+  it("maps an on-chain PlayerNotInGame rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === PLAYER_NOT_IN_GAME_CODE,
+    );
+    await expect(quitGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "You are not a player in this game",
+    });
+  });
+
+  it("re-throws an on-chain error that isn't a recognized quit_game program error", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("network blip"));
+    mockIsGameTokenWalletError.mockReturnValue(false);
+    await expect(quitGame(GAME_ADDRESS)).rejects.toThrow("network blip");
   });
 });

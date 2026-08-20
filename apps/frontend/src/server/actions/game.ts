@@ -23,6 +23,7 @@ import {
   getJoinGameInstructionAsync,
   getMintToPlayerInstructionAsync,
   getTransferTokenInstructionAsync,
+  getQuitGameInstructionAsync,
   fetchAllUser,
   isGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL,
@@ -32,6 +33,7 @@ import {
   GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
   GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER,
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
+  GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME,
   type GameMode,
 } from "on-chain-client";
 import {
@@ -121,7 +123,12 @@ export async function joinGame(gameAddress: string): Promise<JoinGameResult> {
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
 
-  const existingAta = await fetchEncodedAccount(rpc, playerAta);
+  // Read at "confirmed" (matching signAndSendTransaction's confirmation
+  // level below) rather than the RPC-wide default of "finalized" —
+  // "finalized" lags behind "confirmed" and can still see a just-closed ATA
+  // (e.g. from a quit_game CPI) as existing, incorrectly rejecting an
+  // immediate rejoin.
+  const existingAta = await fetchEncodedAccount(rpc, playerAta, { commitment: "confirmed" });
   if (existingAta.exists) {
     return { ok: false, error: "You are already a player in this game" };
   }
@@ -455,6 +462,71 @@ export async function transferTokens(input: TransferTokensInput): Promise<Transf
       return { ok: false, error: friendly, transfersApplied, transfersTotal };
     }
     transfersApplied += chunk.length;
+  }
+
+  return { ok: true };
+}
+
+export type QuitGameResult = { ok: true } | { ok: false; error: string };
+
+export async function quitGame(gameAddress: string): Promise<QuitGameResult> {
+  const username = await getCurrentUsername();
+  if (!username) {
+    return { ok: false, error: "Not signed in" };
+  }
+
+  const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
+
+  const game = await fetchMaybeGame(rpc, gameAddress as Address);
+  if (!game.exists) {
+    return { ok: false, error: "Game not found" };
+  }
+
+  const [userAddress] = await findUserPda(
+    { username, admin: adminSigner.address },
+    { programAddress },
+  );
+  const [playerAta] = await findAssociatedTokenPda({
+    owner: userAddress,
+    mint: game.data.mint,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  const quitGameInstruction = await getQuitGameInstructionAsync(
+    { admin: adminSigner, username, gameId: game.data.gameId, playerAta },
+    { programAddress },
+  );
+
+  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+  const transactionMessage = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(adminSigner, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+    (tx) => appendTransactionMessageInstructions([quitGameInstruction], tx),
+  );
+  try {
+    await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+  } catch (error) {
+    const cause = unwrapSimulationError(error);
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME,
+      )
+    ) {
+      return { ok: false, error: "Transfer admin role to another player before quitting" };
+    }
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+      )
+    ) {
+      return { ok: false, error: "You are not a player in this game" };
+    }
+    throw error;
   }
 
   return { ok: true };

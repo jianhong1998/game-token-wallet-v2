@@ -26,4 +26,6 @@ pub enum ErrorCode {
     SelfTransfer,
     #[msg("Transfer amount must be greater than zero")]
     InvalidTransferAmount,
+    #[msg("The game's admin cannot quit their own game")]
+    AdminCannotQuitGame,
 }

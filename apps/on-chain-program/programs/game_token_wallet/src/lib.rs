@@ -67,4 +67,8 @@ pub mod game_token_wallet {
             amount,
         )
     }
+
+    pub fn quit_game(ctx: Context<QuitGame>, game_id: [u8; 16], username: String) -> Result<()> {
+        instructions::game::quit_game::handler(ctx, game_id, username)
+    }
 }
