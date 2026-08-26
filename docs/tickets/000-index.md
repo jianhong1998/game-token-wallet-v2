@@ -25,7 +25,7 @@ touches one of those areas.
 | 010 | Game admin transfer                                                                       | 006           | Pending |
 | 011 | Quit game                                                                                 | 009           | Done    |
 | 012 | Delete user account                                                                       | 003, 011      | Pending |
-| 013 | Close game (General Mode)                                                                 | 002, 009      | Pending |
+| 013 | Close game (General Mode)                                                                 | 002, 009      | Done    |
 | 014 | Poker Mode: single pot                                                                    | 006, 008      | Pending |
 | 015 | Poker Mode: side pots                                                                     | 014, 013      | Pending |
 | 016 | General Pool Mode                                                                         | 008, 013      | Pending |

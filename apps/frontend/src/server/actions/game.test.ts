@@ -22,6 +22,8 @@ const {
   mockGetMintToPlayerInstructionAsync,
   mockGetTransferTokenInstructionAsync,
   mockGetQuitGameInstructionAsync,
+  mockGetCloseGamePlayerInstructionAsync,
+  mockGetCloseGameInstructionAsync,
   mockFetchAllUser,
   mockIsGameTokenWalletError,
 } = vi.hoisted(() => ({
@@ -35,6 +37,8 @@ const {
   mockGetMintToPlayerInstructionAsync: vi.fn(),
   mockGetTransferTokenInstructionAsync: vi.fn(),
   mockGetQuitGameInstructionAsync: vi.fn(),
+  mockGetCloseGamePlayerInstructionAsync: vi.fn(),
+  mockGetCloseGameInstructionAsync: vi.fn(),
   mockFetchAllUser: vi.fn(),
   mockIsGameTokenWalletError: vi.fn(),
 }));
@@ -52,6 +56,7 @@ const {
   SELF_TRANSFER_CODE,
   INVALID_TRANSFER_AMOUNT_CODE,
   ADMIN_CANNOT_QUIT_GAME_CODE,
+  GAME_NOT_EMPTY_CODE,
 } = vi.hoisted(() => ({
   GAME_FULL_CODE: 0x1774,
   ALREADY_JOINED_GAME_CODE: 0x1775,
@@ -61,6 +66,7 @@ const {
   SELF_TRANSFER_CODE: 0x177a,
   INVALID_TRANSFER_AMOUNT_CODE: 0x177b,
   ADMIN_CANNOT_QUIT_GAME_CODE: 0x177c,
+  GAME_NOT_EMPTY_CODE: 0x177d,
 }));
 vi.mock("on-chain-client", () => ({
   findUserPda: mockFindUserPda,
@@ -73,6 +79,8 @@ vi.mock("on-chain-client", () => ({
   getMintToPlayerInstructionAsync: mockGetMintToPlayerInstructionAsync,
   getTransferTokenInstructionAsync: mockGetTransferTokenInstructionAsync,
   getQuitGameInstructionAsync: mockGetQuitGameInstructionAsync,
+  getCloseGamePlayerInstructionAsync: mockGetCloseGamePlayerInstructionAsync,
+  getCloseGameInstructionAsync: mockGetCloseGameInstructionAsync,
   fetchAllUser: mockFetchAllUser,
   isGameTokenWalletError: mockIsGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL: GAME_FULL_CODE,
@@ -83,6 +91,7 @@ vi.mock("on-chain-client", () => ({
   GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER: SELF_TRANSFER_CODE,
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT: INVALID_TRANSFER_AMOUNT_CODE,
   GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME: ADMIN_CANNOT_QUIT_GAME_CODE,
+  GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY: GAME_NOT_EMPTY_CODE,
 }));
 
 const { mockFindAssociatedTokenPda, mockGetTokenDecoder, mockFetchMaybeToken } = vi.hoisted(() => ({
@@ -119,6 +128,7 @@ import {
   depositToPlayer,
   transferTokens,
   quitGame,
+  closeGame,
   listBrowseGames,
   listMyMemberGames,
   fetchGameDetail,
@@ -1182,5 +1192,202 @@ describe("quitGame", () => {
     mockSignAndSendTransaction.mockRejectedValue(new Error("network blip"));
     mockIsGameTokenWalletError.mockReturnValue(false);
     await expect(quitGame(GAME_ADDRESS)).rejects.toThrow("network blip");
+  });
+});
+
+describe("closeGame", () => {
+  const rawTokenAccountBase64 = "ZmFrZS10b2tlbi1hY2NvdW50LWJ5dGVz";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("host");
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {
+        getLatestBlockhash: () => ({
+          send: async () => ({ value: { blockhash: "fake", lastValidBlockHeight: 1n } }),
+        }),
+        getProgramAccounts: () => ({
+          send: async () => ({
+            value: [
+              { pubkey: "HostAta1", account: { data: [rawTokenAccountBase64, "base64"] } },
+              { pubkey: "PlayerAta1", account: { data: [rawTokenAccountBase64, "base64"] } },
+            ],
+          }),
+        }),
+      },
+      rpcSubscriptions: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeGame.mockResolvedValue({
+      exists: true,
+      address: GAME_ADDRESS,
+      data: gameData({ mint: MINT_ADDRESS, admin: "HostOwner11111111111111111111111111111111" as Address }),
+    });
+    mockGetTokenDecoder.mockReturnValue({
+      decode: vi
+        .fn()
+        .mockReturnValueOnce({ owner: "HostOwner11111111111111111111111111111111", amount: 0n })
+        .mockReturnValueOnce({ owner: "PlayerOwner111111111111111111111111111111", amount: 150n }),
+    });
+    mockFetchAllUser.mockResolvedValue([
+      { data: { username: "host" } },
+      { data: { username: "player1" } },
+    ]);
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+    mockFindAssociatedTokenPda.mockResolvedValue([PLAYER_ATA_ADDRESS, 254]);
+    mockGetCloseGamePlayerInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockGetCloseGameInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
+    mockIsGameTokenWalletError.mockReturnValue(false);
+  });
+
+  it("rejects when not signed in, without touching the chain", async () => {
+    mockGetCurrentUsername.mockResolvedValue(null);
+    await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "Not signed in",
+      playersClosed: 0,
+      playersTotal: 0,
+    });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("treats a missing game as already closed", async () => {
+    mockFetchMaybeGame.mockResolvedValue({ exists: false });
+    await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "Game not found",
+      playersClosed: 0,
+      playersTotal: 0,
+    });
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("closes every discovered player then finalizes on success", async () => {
+    await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({ ok: true });
+    expect(mockGetCloseGamePlayerInstructionAsync).toHaveBeenCalledTimes(2);
+    expect(mockGetCloseGameInstructionAsync).toHaveBeenCalledTimes(1);
+    // 2 player-close sends + 1 final close send (chunking packs both
+    // close_game_player instructions into one chunk at this tiny test size).
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-throws an unrecognized error from a player-close chunk", async () => {
+    mockSignAndSendTransaction.mockRejectedValueOnce(new Error("network blip"));
+    await expect(closeGame(GAME_ADDRESS)).rejects.toThrow("network blip");
+    expect(mockGetCloseGameInstructionAsync).not.toHaveBeenCalled();
+  });
+
+  it("maps a PlayerNotInGame rejection on a player-close chunk to a friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValueOnce(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === PLAYER_NOT_IN_GAME_CODE,
+    );
+    await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "That player is no longer in the game — please try again",
+      playersClosed: 0,
+      playersTotal: 2,
+    });
+    expect(mockGetCloseGameInstructionAsync).not.toHaveBeenCalled();
+  });
+
+  it("maps a NotGameAdmin rejection on a player-close chunk to a friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValueOnce(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === NOT_GAME_ADMIN_CODE,
+    );
+    await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "You are no longer this game's admin",
+      playersClosed: 0,
+      playersTotal: 2,
+    });
+    expect(mockGetCloseGameInstructionAsync).not.toHaveBeenCalled();
+  });
+
+  it("maps a GameNotEmpty rejection on the final close to a friendly message", async () => {
+    mockSignAndSendTransaction
+      .mockResolvedValueOnce(undefined) // player-close chunk succeeds
+      .mockRejectedValueOnce(new Error("simulation failed")); // final close fails
+    mockIsGameTokenWalletError.mockImplementation((_error, _tx, code) => code === GAME_NOT_EMPTY_CODE);
+    await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({
+      ok: false,
+      error: "A player joined or was paid while closing — please try again",
+      playersClosed: 2,
+      playersTotal: 2,
+    });
+  });
+
+  it("re-throws an unrecognized error from the final close", async () => {
+    mockSignAndSendTransaction
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("network blip"));
+    mockIsGameTokenWalletError.mockReturnValue(false);
+    await expect(closeGame(GAME_ADDRESS)).rejects.toThrow("network blip");
+  });
+
+  it("resumes correctly on retry after a partial failure, re-closing only what discovery still finds", async () => {
+    // First call: 2 members discovered, the only chunk's send fails —
+    // nothing actually closed on-chain.
+    mockSignAndSendTransaction.mockRejectedValueOnce(new Error("network blip"));
+    await expect(closeGame(GAME_ADDRESS)).rejects.toThrow("network blip");
+
+    // Retry: re-discovery now finds only ONE remaining member (simulating
+    // live on-chain state after some other successful closure, or simply a
+    // fresh scan) — closeGame must build exactly one close_game_player
+    // instruction this time, not two, since it never tracks prior attempts.
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("host");
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {
+        getLatestBlockhash: () => ({
+          send: async () => ({ value: { blockhash: "fake", lastValidBlockHeight: 1n } }),
+        }),
+        getProgramAccounts: () => ({
+          send: async () => ({
+            value: [{ pubkey: "PlayerAta1", account: { data: [rawTokenAccountBase64, "base64"] } }],
+          }),
+        }),
+      },
+      rpcSubscriptions: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeGame.mockResolvedValue({
+      exists: true,
+      address: GAME_ADDRESS,
+      data: gameData({ mint: MINT_ADDRESS, admin: "HostOwner11111111111111111111111111111111" as Address }),
+    });
+    mockGetTokenDecoder.mockReturnValue({
+      decode: vi
+        .fn()
+        .mockReturnValueOnce({ owner: "PlayerOwner111111111111111111111111111111", amount: 150n }),
+    });
+    mockFetchAllUser.mockResolvedValue([{ data: { username: "player1" } }]);
+    mockGetCloseGamePlayerInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockGetCloseGameInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
+    mockIsGameTokenWalletError.mockReturnValue(false);
+
+    await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({ ok: true });
+    expect(mockGetCloseGamePlayerInstructionAsync).toHaveBeenCalledTimes(1);
   });
 });

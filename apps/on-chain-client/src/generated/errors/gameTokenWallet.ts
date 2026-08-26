@@ -40,11 +40,17 @@ export const GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER = 0x177a; // 6010
 export const GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT = 0x177b; // 6011
 /** AdminCannotQuitGame: The game's admin cannot quit their own game */
 export const GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME = 0x177c; // 6012
+/** GameNotEmpty: Cannot close a game that still has players — close every player first */
+export const GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY = 0x177d; // 6013
+/** GameNotInRegistry: Game was not found in the registry's active-games list */
+export const GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY = 0x177e; // 6014
 
 export type GameTokenWalletError =
   | typeof GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME
   | typeof GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME
   | typeof GAME_TOKEN_WALLET_ERROR__GAME_FULL
+  | typeof GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY
+  | typeof GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS
   | typeof GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH
@@ -63,6 +69,8 @@ if (process.env.NODE_ENV !== "production") {
     [GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME]: `The game's admin cannot quit their own game`,
     [GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME]: `You are already a player in this game`,
     [GAME_TOKEN_WALLET_ERROR__GAME_FULL]: `Game already has the maximum of 20 players`,
+    [GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY]: `Cannot close a game that still has players — close every player first`,
+    [GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY]: `Game was not found in the registry's active-games list`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT]: `Deposit amount must be greater than zero`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_CHARACTERS]: `Game name can only contain letters, numbers, and spaces`,
     [GAME_TOKEN_WALLET_ERROR__INVALID_GAME_NAME_LENGTH]: `Game name must be between 3 and 32 bytes`,

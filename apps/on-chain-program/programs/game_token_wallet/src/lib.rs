@@ -71,4 +71,17 @@ pub mod game_token_wallet {
     pub fn quit_game(ctx: Context<QuitGame>, game_id: [u8; 16], username: String) -> Result<()> {
         instructions::game::quit_game::handler(ctx, game_id, username)
     }
+
+    pub fn close_game_player(
+        ctx: Context<CloseGamePlayer>,
+        game_id: [u8; 16],
+        username: String,
+        player_username: String,
+    ) -> Result<()> {
+        instructions::game::close_game_player::handler(ctx, game_id, username, player_username)
+    }
+
+    pub fn close_game(ctx: Context<CloseGame>, game_id: [u8; 16], username: String) -> Result<()> {
+        instructions::game::close_game::handler(ctx, game_id, username)
+    }
 }
