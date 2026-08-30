@@ -7,9 +7,9 @@ import { test, expect } from "@playwright/test";
 // frontend `joinGame` server action all work correctly (verified directly,
 // and the on-chain e2e "rejoin after quitting" test passes reliably even on
 // fresh stacks). This is simply the heaviest single test in the suite — 2
-// registrations + create game + join + quit + rejoin, i.e. 6 sequential
-// "confirmed"-commitment on-chain round trips across 2 browser contexts —
-// so under real parallel-worker/cold-container contention (the exact
+// registrations + create game + join + deposit + quit + rejoin, i.e. 7
+// sequential "confirmed"-commitment on-chain round trips across 2 browser
+// contexts — so under real parallel-worker/cold-container contention (the exact
 // condition `just test`'s CI job runs under) its cumulative wall-clock time
 // sits right at the edge of the suite's shared 30_000ms convention: measured
 // 26.1s-29.5s total across multiple full-suite contended runs, vs. an
@@ -66,6 +66,20 @@ test("a non-admin player quits a game, is removed from the roster, and can rejoi
   await expect(page.getByRole("button", { name: "Quit game" })).toHaveCount(0);
   await expect(page.getByTestId("players-list")).toContainText(playerUsername);
 
+  // Host deposits so the quitting player's balance is nonzero — the spec
+  // requires burning a positive balance to work, not just the zero-balance
+  // case (a player who never had anything deposited to them).
+  await page.getByRole("button", { name: "Admin controls" }).click();
+  await page.getByLabel("Player").selectOption(playerUsername);
+  await page.locator("#deposit-amount").fill("5.00");
+  await page.getByRole("button", { name: "Deposit" }).click();
+  await expect(
+    page.getByTestId("players-list").locator("li").filter({ hasText: playerUsername }),
+  ).toContainText("5.00");
+
+  await secondPage.reload();
+  await expect(secondPage.getByTestId("my-balance")).toContainText("5.00");
+
   // The non-admin player quits, with a confirmation step in between.
   await expect(secondPage.getByRole("button", { name: "Quit game" })).toBeVisible();
   await secondPage.getByRole("button", { name: "Quit game" }).click();
@@ -73,9 +87,19 @@ test("a non-admin player quits a game, is removed from the roster, and can rejoi
   await secondPage.getByRole("button", { name: "Quit", exact: true }).click();
   await expect(secondPage).toHaveURL(/\/$/, { timeout: 60_000 });
 
+  // The departed player's own dashboard no longer lists the game — this
+  // was their only game, so listMyMemberGames() now returns empty.
+  await expect(secondPage.getByTestId("home-empty")).toBeVisible();
+
   // Host's roster, reloaded, no longer lists the departed player.
   await page.reload();
   await expect(page.getByTestId("players-list")).not.toContainText(playerUsername);
+
+  // The departed player also drops off the admin's deposit-recipient
+  // picker — it's populated from the same live player list.
+  await page.getByRole("button", { name: "Admin controls" }).click();
+  await expect(page.locator("#deposit-player option", { hasText: playerUsername })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
 
   // The departed player can rejoin the same game.
   await secondPage.goto("/games/all");
