@@ -24,6 +24,8 @@ import {
   getMintToPlayerInstructionAsync,
   getTransferTokenInstructionAsync,
   getQuitGameInstructionAsync,
+  getCloseGamePlayerInstructionAsync,
+  getCloseGameInstructionAsync,
   fetchAllUser,
   isGameTokenWalletError,
   GAME_TOKEN_WALLET_ERROR__GAME_FULL,
@@ -34,6 +36,7 @@ import {
   GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER,
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
   GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME,
+  GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY,
   type GameMode,
 } from "on-chain-client";
 import {
@@ -649,6 +652,56 @@ export interface GameDetail {
   players: GamePlayer[];
 }
 
+interface GameMember {
+  username: string;
+  owner: Address;
+  ata: Address;
+  balance: number;
+}
+
+// Shared by fetchGameDetail (needs balance + admin-flag context) and
+// closeGame (needs every current player's username + ata to build
+// close_game_player instructions) — both derive membership the same way:
+// no on-chain player list exists, so live token accounts against the
+// game's mint ARE the membership list (see registry/game capability specs).
+async function fetchGameMembers(
+  rpc: Awaited<ReturnType<typeof getSolanaContext>>["rpc"],
+  mint: Address,
+): Promise<GameMember[]> {
+  const { value: tokenAccounts } = await rpc
+    .getProgramAccounts(TOKEN_PROGRAM_ADDRESS, {
+      encoding: "base64",
+      withContext: true,
+      filters: [
+        { dataSize: 165n },
+        {
+          memcmp: {
+            offset: 0n,
+            bytes: mint as unknown as Base58EncodedBytes,
+            encoding: "base58",
+          },
+        },
+      ],
+    })
+    .send();
+
+  const tokenDecoder = getTokenDecoder();
+  const holders = tokenAccounts.map(({ pubkey, account }) => {
+    const decoded = tokenDecoder.decode(Buffer.from(account.data[0], "base64"));
+    return { owner: decoded.owner, ata: pubkey, balance: Number(decoded.amount) / 100 };
+  });
+
+  const owners = holders.map((holder) => holder.owner);
+  const userAccounts = owners.length ? await fetchAllUser(rpc, owners) : [];
+
+  return holders.map((holder, index) => ({
+    username: userAccounts[index].data.username,
+    owner: holder.owner,
+    ata: holder.ata,
+    balance: holder.balance,
+  }));
+}
+
 export async function fetchGameDetail(gameAddress: string): Promise<GameDetail | null> {
   const username = await getCurrentUsername();
   if (!username) return null;
@@ -662,46 +715,121 @@ export async function fetchGameDetail(gameAddress: string): Promise<GameDetail |
     { programAddress },
   );
 
-  const { value: tokenAccounts } = await rpc
-    .getProgramAccounts(TOKEN_PROGRAM_ADDRESS, {
-      encoding: "base64",
-      withContext: true,
-      filters: [
-        { dataSize: 165n },
-        {
-          memcmp: {
-            offset: 0n,
-            bytes: game.data.mint as unknown as Base58EncodedBytes,
-            encoding: "base58",
-          },
-        },
-      ],
-    })
-    .send();
+  const members = await fetchGameMembers(rpc, game.data.mint);
 
-  const tokenDecoder = getTokenDecoder();
-  const holders = tokenAccounts.map(({ account }) => {
-    const decoded = tokenDecoder.decode(Buffer.from(account.data[0], "base64"));
-    return { owner: decoded.owner, balance: Number(decoded.amount) / 100 };
-  });
-
-  const owners = holders.map((holder) => holder.owner);
-  const userAccounts = owners.length ? await fetchAllUser(rpc, owners) : [];
-
-  const players: GamePlayer[] = holders.map((holder, index) => ({
-    username: userAccounts[index].data.username,
-    balance: holder.balance,
-    isAdmin: holder.owner === game.data.admin,
+  const players: GamePlayer[] = members.map((member) => ({
+    username: member.username,
+    balance: member.balance,
+    isAdmin: member.owner === game.data.admin,
   }));
 
-  const myHolderIndex = owners.findIndex((owner) => owner === userAddress);
+  const myMemberIndex = members.findIndex((member) => member.owner === userAddress);
 
   return {
     address: game.address,
     name: game.data.name,
     mode: game.data.mode,
     isAdmin: game.data.admin === userAddress,
-    myBalance: myHolderIndex === -1 ? 0 : holders[myHolderIndex].balance,
+    myBalance: myMemberIndex === -1 ? 0 : members[myMemberIndex].balance,
     players,
   };
+}
+
+export type CloseGameResult =
+  | { ok: true }
+  | { ok: false; error: string; playersClosed: number; playersTotal: number };
+
+export async function closeGame(gameAddress: string): Promise<CloseGameResult> {
+  const username = await getCurrentUsername();
+  if (!username) {
+    return { ok: false, error: "Not signed in", playersClosed: 0, playersTotal: 0 };
+  }
+
+  const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
+
+  const game = await fetchMaybeGame(rpc, gameAddress as Address);
+  if (!game.exists) {
+    // Retrying after a full prior success lands here: the Game account no
+    // longer exists once closed. Treat as an already-closed game, not an
+    // error — see design.md D5.
+    return { ok: false, error: "Game not found", playersClosed: 0, playersTotal: 0 };
+  }
+
+  const members = await fetchGameMembers(rpc, game.data.mint);
+  const playersTotal = members.length;
+
+  const closeInstructions = await Promise.all(
+    members.map((member) =>
+      getCloseGamePlayerInstructionAsync(
+        {
+          admin: adminSigner,
+          username,
+          gameId: game.data.gameId,
+          playerUsername: member.username,
+          playerAta: member.ata,
+        },
+        { programAddress },
+      ),
+    ),
+  );
+
+  const chunks = chunkInstructionsBySize(closeInstructions, adminSigner.address);
+
+  let playersClosed = 0;
+  for (const chunk of chunks) {
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(adminSigner, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions(chunk, tx),
+    );
+    try {
+      await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+    } catch (error) {
+      const cause = unwrapSimulationError(error);
+      let friendly: string;
+      if (isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN)) {
+        friendly = "You are no longer this game's admin";
+      } else if (
+        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
+      ) {
+        friendly = "That player is no longer in the game — please try again";
+      } else {
+        throw error;
+      }
+      return { ok: false, error: friendly, playersClosed, playersTotal };
+    }
+    playersClosed += chunk.length;
+  }
+
+  const closeGameInstruction = await getCloseGameInstructionAsync(
+    { admin: adminSigner, username, gameId: game.data.gameId },
+    { programAddress },
+  );
+  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+  const finalTransactionMessage = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(adminSigner, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+    (tx) => appendTransactionMessageInstructions([closeGameInstruction], tx),
+  );
+  try {
+    await signAndSendTransaction(finalTransactionMessage, { rpc, rpcSubscriptions });
+  } catch (error) {
+    const cause = unwrapSimulationError(error);
+    if (
+      isGameTokenWalletError(cause, finalTransactionMessage, GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY)
+    ) {
+      return {
+        ok: false,
+        error: "A player joined or was paid while closing — please try again",
+        playersClosed,
+        playersTotal,
+      };
+    }
+    throw error;
+  }
+
+  return { ok: true };
 }

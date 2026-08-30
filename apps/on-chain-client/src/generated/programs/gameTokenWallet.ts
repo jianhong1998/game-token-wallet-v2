@@ -17,6 +17,8 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
+  parseCloseGameInstruction,
+  parseCloseGamePlayerInstruction,
   parseCreateGameInstruction,
   parseCreateUserInstruction,
   parseInitializeRegistryInstruction,
@@ -24,6 +26,8 @@ import {
   parseMintToPlayerInstruction,
   parseQuitGameInstruction,
   parseTransferTokenInstruction,
+  type ParsedCloseGameInstruction,
+  type ParsedCloseGamePlayerInstruction,
   type ParsedCreateGameInstruction,
   type ParsedCreateUserInstruction,
   type ParsedInitializeRegistryInstruction,
@@ -85,6 +89,8 @@ export function identifyGameTokenWalletAccount(
 }
 
 export enum GameTokenWalletInstruction {
+  CloseGame,
+  CloseGamePlayer,
   CreateGame,
   CreateUser,
   InitializeRegistry,
@@ -98,6 +104,28 @@ export function identifyGameTokenWalletInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): GameTokenWalletInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([237, 236, 157, 201, 253, 20, 248, 67]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.CloseGame;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([76, 54, 174, 159, 178, 6, 13, 35]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.CloseGamePlayer;
+  }
   if (
     containsBytes(
       data,
@@ -184,6 +212,12 @@ export type ParsedGameTokenWalletInstruction<
   TProgram extends string = "FHRNx4KK4WzMxXx7X6sK84RvKTKuDVtTGduW3eH9QN9t",
 > =
   | ({
+      instructionType: GameTokenWalletInstruction.CloseGame;
+    } & ParsedCloseGameInstruction<TProgram>)
+  | ({
+      instructionType: GameTokenWalletInstruction.CloseGamePlayer;
+    } & ParsedCloseGamePlayerInstruction<TProgram>)
+  | ({
       instructionType: GameTokenWalletInstruction.CreateGame;
     } & ParsedCreateGameInstruction<TProgram>)
   | ({
@@ -210,6 +244,20 @@ export function parseGameTokenWalletInstruction<TProgram extends string>(
 ): ParsedGameTokenWalletInstruction<TProgram> {
   const instructionType = identifyGameTokenWalletInstruction(instruction);
   switch (instructionType) {
+    case GameTokenWalletInstruction.CloseGame: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.CloseGame,
+        ...parseCloseGameInstruction(instruction),
+      };
+    }
+    case GameTokenWalletInstruction.CloseGamePlayer: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.CloseGamePlayer,
+        ...parseCloseGamePlayerInstruction(instruction),
+      };
+    }
     case GameTokenWalletInstruction.CreateGame: {
       assertIsInstructionWithAccounts(instruction);
       return {

@@ -28,4 +28,8 @@ pub enum ErrorCode {
     InvalidTransferAmount,
     #[msg("The game's admin cannot quit their own game")]
     AdminCannotQuitGame,
+    #[msg("Cannot close a game that still has players — close every player first")]
+    GameNotEmpty,
+    #[msg("Game was not found in the registry's active-games list")]
+    GameNotInRegistry,
 }
