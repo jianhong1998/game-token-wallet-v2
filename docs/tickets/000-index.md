@@ -100,5 +100,5 @@ graph TD
     classDef done stroke:#2ecc71,stroke-width:3px;
     classDef inProgress stroke:#f1c40f,stroke-width:3px;
 
-    class 001,002,003,005,006,008,009,011,017,018,019,020,021 done;
+    class 001,002,003,005,006,008,009,011,013,017,018,019,020,021 done;
 ```
