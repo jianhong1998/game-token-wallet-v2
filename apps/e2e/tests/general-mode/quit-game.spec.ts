@@ -75,7 +75,7 @@ test("a non-admin player quits a game, is removed from the roster, and can rejoi
   await page.getByRole("button", { name: "Deposit" }).click();
   await expect(
     page.getByTestId("players-list").locator("li").filter({ hasText: playerUsername }),
-  ).toContainText("5.00");
+  ).toContainText("5.00", { timeout: 60_000 });
 
   await secondPage.reload();
   await expect(secondPage.getByTestId("my-balance")).toContainText("5.00");

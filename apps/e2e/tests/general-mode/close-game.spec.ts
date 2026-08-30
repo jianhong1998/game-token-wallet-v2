@@ -51,6 +51,7 @@ test("an admin closes a game after cancelling once, and it disappears everywhere
 
   // Non-admin never sees a "Close game" action; the admin does.
   await expect(playerPage.getByRole("button", { name: "Close game" })).toHaveCount(0);
+  await expect(playerPage.getByRole("button", { name: "Quit game" })).toBeVisible();
   await page.getByRole("link", { name: new RegExp(gameName) }).click();
   await expect(page).toHaveURL(/\/games\/.+/, { timeout: 60_000 });
   await expect(page.getByRole("button", { name: "Close game" })).toBeVisible();
@@ -72,6 +73,7 @@ test("an admin closes a game after cancelling once, and it disappears everywhere
 
   // It's gone from the browse list.
   await page.goto("/games/all");
+  await expect(page.getByRole("heading", { name: "Browse games" })).toBeVisible();
   await expect(page.locator("li").filter({ hasText: gameName })).toHaveCount(0);
 
   // It's gone from the former player's own dashboard too.
