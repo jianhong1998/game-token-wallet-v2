@@ -32,4 +32,6 @@ pub enum ErrorCode {
     GameNotEmpty,
     #[msg("Game was not found in the registry's active-games list")]
     GameNotInRegistry,
+    #[msg("Cannot transfer the admin role to yourself")]
+    CannotTransferAdminToSelf,
 }

@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { depositToPlayer, type GamePlayer } from "@/server/actions/game";
+import { depositToPlayer, transferGameAdmin, type GamePlayer } from "@/server/actions/game";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -19,13 +19,20 @@ export default function AdminControlsModal({
   const [playerUsername, setPlayerUsername] = useState("");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [transferUsername, setTransferUsername] = useState("");
+  const [transferError, setTransferError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isTransferPending, startTransferTransition] = useTransition();
+
+  const otherPlayers = players.filter((player) => !player.isAdmin);
 
   function closeModal() {
     setIsOpen(false);
     setPlayerUsername("");
     setAmount("");
     setError(null);
+    setTransferUsername("");
+    setTransferError(null);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -53,6 +60,35 @@ export default function AdminControlsModal({
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      }
+    });
+  }
+
+  function handleTransfer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTransferError(null);
+
+    if (!transferUsername) {
+      setTransferError("Select a player");
+      return;
+    }
+
+    startTransferTransition(async () => {
+      try {
+        const result = await transferGameAdmin({
+          gameAddress,
+          playerUsername: transferUsername,
+        });
+        if (result.ok) {
+          closeModal();
+          router.refresh();
+        } else {
+          setTransferError(result.error);
+        }
+      } catch (err) {
+        setTransferError(
+          err instanceof Error ? err.message : "Something went wrong. Please try again.",
+        );
       }
     });
   }
@@ -125,6 +161,42 @@ export default function AdminControlsModal({
               {error && (
                 <Alert data-testid="deposit-error" variant="error">
                   {error}
+                </Alert>
+              )}
+            </form>
+            <form onSubmit={handleTransfer} className="mt-6 flex flex-col gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-text-secondary">
+                Transfer admin role
+              </p>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label
+                    htmlFor="transfer-admin-player"
+                    className="mb-1.5 block text-[11px] font-bold text-text-primary"
+                  >
+                    New admin
+                  </label>
+                  <select
+                    id="transfer-admin-player"
+                    value={transferUsername}
+                    onChange={(event) => setTransferUsername(event.target.value)}
+                    className="glass-input h-11 w-full px-4 text-sm text-text-primary"
+                  >
+                    <option value="">Select player…</option>
+                    {otherPlayers.map((player) => (
+                      <option key={player.username} value={player.username}>
+                        {player.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button type="submit" variant="destructive" isLoading={isTransferPending}>
+                  Transfer
+                </Button>
+              </div>
+              {transferError && (
+                <Alert data-testid="transfer-admin-error" variant="error">
+                  {transferError}
                 </Alert>
               )}
             </form>
