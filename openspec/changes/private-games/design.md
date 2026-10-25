@@ -44,15 +44,19 @@ There is no confirm-password field. The design sample's create form and join pro
 
 **Alternative considered:** a shorter or numeric table password, because a game password is shared at the table. Rejected — the product owner said to reuse 003's rules where they are sensible, and they fit an 8–20 shared secret without a second policy to test.
 
-### D2: Account layout is three fixed fields, appended
+### D2: Password material lives on the `Game` account
+
+The per-game salt and the per-game scrypt hash are fields of the `Game` account data (the PDA seeded `["game", game_id]`). That is the PRD's "stored into the game account data as hash", plus the salt ticket 003's scrypt needs in order to verify. They are not a second PDA, not a memo, and not a row in an off-chain store. The plaintext password is never written.
 
 ```rust
-pub is_private: bool,
-pub password_salt: [u8; SALT_BYTES],       // 16, from state/user.rs
-pub password_hash: [u8; PASSWORD_HASH_BYTES], // 64, from state/user.rs
+pub is_private: bool,                          // 1 byte
+pub password_salt: [u8; SALT_BYTES],           // 16, from state/user.rs
+pub password_hash: [u8; PASSWORD_HASH_BYTES],  // 64, from state/user.rs
 ```
 
 Appended after `player_count`, so the offsets of `bump` through `player_count` do not move. `Game::INIT_SPACE` becomes 201. The account is `8 + 201 = 209` bytes (was `8 + 120 = 128`). The sizing test in `state/game.rs` is the guard, using `SALT_BYTES` and `PASSWORD_HASH_BYTES` so the widths cannot drift from `User`.
+
+`Game` account data is publicly readable on-chain. Anyone with RPC access can copy `password_salt` and `password_hash` and attempt an offline brute force. The mitigation is the slow, salted scrypt from ticket 003 (`crypto.scrypt`, N=16384, r=8, p=1, a fresh 16-byte salt per hash) plus the 8-character minimum from `validatePassword`. That is acceptable for casual games among people who already share a table password. It is not strong secrecy. UI copy and docs must not describe the game password, the salt, or the hash as hidden, private to the server, or safe against someone who can read the account. Not rendering the hash in the client is convenience, not a confidentiality boundary.
 
 "No password" is `is_private == false` plus both arrays zero, not an `Option`. A bool is the flag. Inferring privacy from a non-zero hash would make a partial write ambiguous. `Option<[u8; 64]>` is what ticket 005's design sketch named, and it did not include a salt. A hash without the salt cannot be checked by ticket 003's scrypt, so the sketch is not the layout.
 
@@ -99,12 +103,12 @@ Handler order:
 
 Admin is first so a non-admin acting on a public game gets `NotGameAdmin`, not `GameIsNotPrivate`. The current admin of a public game is who gets `GameIsNotPrivate`.
 
-New errors are appended after `GameNotInRegistry` (index 14, `6014` / `0x177E` on `main` today):
+Ticket 010's spec is on `main` and appends `CannotTransferAdminToSelf` after `GameNotInRegistry` (index 14, `6014` / `0x177E`) as index 15, `6015` / `0x177F`. Its implementation (#40) is expected to merge first and is not in `errors.rs` yet. This change appends after that variant, never in the middle, so the final numbering is:
 
-- `InvalidGamePassword` ("A private game's password salt and hash must each contain a non-zero byte, and a public game's must each be all zeros") — index 15, `6015` / `0x177F`
-- `GameIsNotPrivate` — index 16, `6016` / `0x1780`
+- `InvalidGamePassword` ("A private game's password salt and hash must each contain a non-zero byte, and a public game's must each be all zeros") — index 16, `6016` / `0x1780`
+- `GameIsNotPrivate` ("Only a private game has a password") — index 17, `6017` / `0x1781`
 
-Ticket 010's open spec also claims `6015` for `CannotTransferAdminToSelf`. Whichever implementation merges second appends after the enum as it exists then and recomputes the hex. Neither change inserts in the middle. Existing codes stay put.
+Append only. Do not insert in the middle. Existing codes, including `6014` / `0x177E` and 010's `6015` / `0x177F`, stay put. If this change's program code is written while `errors.rs` still ends at `GameNotInRegistry`, do not leave the two variants at `6015` / `6016`. Put them after `CannotTransferAdminToSelf` before the client pin is written, so the pin matches `6016` and `6017`. Every other test matches these errors by name and does not mention a numeric code.
 
 The admin does not submit the previous password. The session is the authorization. Settled product rule: players already in the game are not removed and are not asked to confirm. Not asking the admin for the old password is the matching choice — they may have forgotten the shared secret, and there is no recovery flow in the PRD.
 
@@ -173,7 +177,11 @@ Server Action tests in `game.test.ts`, mocking `hashPassword` / `verifyPassword`
 
 Playwright `apps/e2e/tests/private-game.spec.ts`, three contexts, unique usernames, passwords that pass `validatePassword` (`Abcdef123!` is already the e2e login password; use a different game password so a login password is not silently the game password). Create private, home shows Private, joiner sees the row and the prompt, wrong password stays on browse and the count stays `1/20`, right password joins, admin changes the password, the first joiner still opens the game with no prompt and is still on the roster, a third user fails the old password and joins with the new one.
 
-`apps/on-chain-client/src/index.test.ts` asserts `getSetGamePasswordInstructionAsync` and the two new error constants, and that `GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY` is still `0x177e` when this change is applied to today's enum.
+`apps/on-chain-client/src/index.test.ts` is the only numeric pin, the same kind of pin as ticket 010's `0x177f` check, and it is written at implementation time against the final numbering in D4. After codegen it asserts `GAME_TOKEN_WALLET_ERROR__INVALID_GAME_PASSWORD` is `0x1780`, `GAME_TOKEN_WALLET_ERROR__GAME_IS_NOT_PRIVATE` is `0x1781`, `GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF` is still `0x177f`, and `GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY` is still `0x177e`. It also asserts `getSetGamePasswordInstructionAsync` is a function. No second pin is written for an interim numbering.
+
+Every other test matches a program error by name. On-chain e2e passes the generated constant to `isGameTokenWalletError` (`GAME_TOKEN_WALLET_ERROR__INVALID_GAME_PASSWORD`, `GAME_TOKEN_WALLET_ERROR__GAME_IS_NOT_PRIVATE`, and the existing `NOT_GAME_ADMIN` / `GAME_FULL` constants), the same shape as `create_game.test.ts`. It does not compare against `0x1780`, `6016`, or any other literal. Server Action tests mock those two constants by name and assert the mapped message. The mock numbers are not a pin.
+
+The password rule is not an on-chain test. `join_game` does not see the password, so `private_game.test.ts` checks stored salt and hash bytes, account length, and program errors (`InvalidGamePassword`, `GameIsNotPrivate`, `NotGameAdmin`, `GameFull`). It does not call `validatePassword`, does not reject a wrong password string, and does not run scrypt. Those cases are Server Action unit tests and the Playwright flow.
 
 Every existing `getCreateGameInstructionAsync` call passes `isPrivate: false` and two zero arrays. Public e2e (`game-creation.spec.ts`, `game-joining.spec.ts`) is unchanged because the create form defaults to Public.
 
@@ -181,12 +189,13 @@ Do not edit CircleCI config.
 
 ## Risks / Trade-offs
 
-- **[Risk]** Ticket 010 lands first and `6015` is already `CannotTransferAdminToSelf`. → **Mitigation:** append only; the plan says to recompute the two new codes from the enum as it exists at implementation time, and the client test asserts the neighbor code that must not move.
+- **[Risk]** Ticket 010's `CannotTransferAdminToSelf` (`6015` / `0x177F`) is not in `errors.rs` yet. #40 is expected to merge first; if this change's variants land ahead of it they would take `6015` and `6016`. → **Mitigation:** D4. Append after `CannotTransferAdminToSelf`, and write the single client pin for `6016` / `0x1780` and `6017` / `0x1781` at implementation time. On-chain e2e and Server Action tests match the error by name, so they do not encode either numbering.
 - **[Risk]** A `Game` created before this upgrade is 128 bytes and will not deserialize. A `Game` created after it is 209 bytes and will not deserialize on the previous program if borsh rejects trailing bytes. → **Mitigation:** D2 and the migration plan. No mixed-version rollback. Reset local and devnet state as part of deploy, same as ticket 006.
 - **[Risk]** A later change "fixes" the direct-`join_game` success by comparing a caller-supplied hash to the account. That check does not prove knowledge of the password, and it breaks the specified trust boundary. → **Mitigation:** the requirement "Join instruction does not check the password" and the e2e that expects success.
 - **[Risk]** Adding `pub fn ensure_caller_is_admin` in the new module makes the glob export ambiguous. → **Mitigation:** D4 calls the `close_game` helper.
 - **[Risk]** `create_game`'s new required arguments break every Codama call site at once. → **Mitigation:** the plan lists them and treats "public args added, existing tests still pass" as its own step before the private-game tests.
 - **[Risk]** The admin's browser shows the old password form until refresh. → **Mitigation:** success calls `router.refresh()`. A stale submit still writes a hash the admin just chose; it cannot admit a non-admin, because the program checks `Game.admin`.
+- **[Risk]** Someone reads "password hash" and treats the game password as a secret the chain cannot see. → **Mitigation:** D2. The salt and hash are public account data. UI and docs must not claim otherwise. The mitigation is slow salted scrypt and an 8-character minimum, which is not strong secrecy.
 
 ## Migration Plan
 

@@ -5,11 +5,11 @@ Password-protected games that stay visible in the browse list. Joining requires 
 ## ADDED Requirements
 
 ### Requirement: Creating a private game
-The system SHALL let a logged-in user create a private game by choosing private and supplying a password. The server SHALL hash that password with the same function used for user login (`hashPassword` in `apps/frontend/src/server/password.ts`: Node `crypto.scrypt`, N=16384, r=8, p=1, a new random 16-byte salt, a 64-byte hash) and SHALL send only the salt and the hash. The password SHALL satisfy the same rules as a login password (`validatePassword` in `apps/frontend/src/lib/password-rules.ts`: length 8–20, charset `/^[A-Za-z0-9!@#$%^&*()_+\-=[\]{}|;:,.<>?]+$/`). The creator becomes a player through `create_game`'s existing auto-join, not through `join_game`, and does not have to enter the password a second time.
+The system SHALL let a logged-in user create a private game by choosing private and supplying a password. The server SHALL hash that password with the same function used for user login (`hashPassword` in `apps/frontend/src/server/password.ts`: Node `crypto.scrypt`, N=16384, r=8, p=1, a new random 16-byte salt, a 64-byte hash) and SHALL send only the salt and the hash. Those bytes are written into that game's `Game` account as `password_salt: [u8; 16]` and `password_hash: [u8; 64]` (see the `game` capability's "Game password fields" requirement). The password SHALL satisfy the same rules as a login password (`validatePassword` in `apps/frontend/src/lib/password-rules.ts`: length 8–20, charset `/^[A-Za-z0-9!@#$%^&*()_+\-=[\]{}|;:,.<>?]+$/`). The creator becomes a player through `create_game`'s existing auto-join, not through `join_game`, and does not have to enter the password a second time.
 
 #### Scenario: Private game stores the hash and the creator is a player
 - **WHEN** a logged-in user creates a game as private with a password that passes `validatePassword`
-- **THEN** the game is private, its salt and hash are the bytes `hashPassword` produced for that password, `player_count` is 1, the creator's ATA exists with a zero balance, and no `join_game` instruction was submitted
+- **THEN** the game is private, the `Game` account's `password_salt` (16 bytes) and `password_hash` (64 bytes) are the bytes `hashPassword` produced for that password, `player_count` is 1, the creator's ATA exists with a zero balance, and no `join_game` instruction was submitted
 
 #### Scenario: Empty password rejected before the chain
 - **WHEN** a logged-in user chooses private and submits the create form with an empty password

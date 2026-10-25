@@ -7,7 +7,7 @@
 
 **Goal:** Let a game admin create a password-protected game that stays visible in the browse list, require that password for every new join, and let the current admin replace the password without removing anyone already in the game.
 
-**Architecture:** `Game` grows by three fields appended after `player_count` (`is_private`, `password_salt`, `password_hash`). The Next.js server hashes with the existing ticket 003 scrypt helper and sends only the salt and hash. `create_game` records them and still auto-joins the creator. A new `set_game_password` instruction replaces them when the caller is `Game.admin`. `join_game` is unchanged; the server calls `verifyPassword` before it will sign that instruction. Lists show Private or Public. A private row asks for the password; a public row still joins in one click.
+**Architecture:** The per-game scrypt salt and hash live in the `Game` account data: `password_salt: [u8; 16]` and `password_hash: [u8; 64]`, appended after `player_count` with `is_private: bool`. The Next.js server hashes with the existing ticket 003 scrypt helper and sends only those bytes. `create_game` writes them onto that account and still auto-joins the creator. A new `set_game_password` instruction replaces them when the caller is `Game.admin`. `join_game` is unchanged; the server calls `verifyPassword` before it will sign that instruction. Lists show Private or Public. A private row asks for the password; a public row still joins in one click.
 
 **Tech Stack:** Rust/Anchor 1.x (on-chain program), TypeScript/Next.js App Router (Server Actions + existing pages), Codama-generated `on-chain-client`, Vitest, `anchor test` via Surfpool (on-chain-program-e2e), Playwright (e2e). Node `crypto.scrypt` via the existing `apps/frontend/src/server/password.ts` — no new dependency.
 
@@ -17,12 +17,15 @@
 
 - Implementation branch is `feat/007-private-games` per `.claude/rules/branch-name-rule.md`. Do not implement on the docs branch that added this plan.
 - Password hashing is ticket 003's. Call `hashPassword` / `verifyPassword` / `validatePassword`. Do not add a crate, an npm package, or a second charset. Length 8–20. Charset `/^[A-Za-z0-9!@#$%^&*()_+\-=[\]{}|;:,.<>?]+$/`. A new salt on every hash. Compare only through `verifyPassword`.
-- Append fields. Do not reorder `Game`. `INIT_SPACE` goes from 120 to 201. Account data length is 209 (`8 + 201`). Public means `is_private = false` and both arrays zero. Do not use `Option`.
+- Password material is fields of the `Game` account, not a second account and not off-chain: `is_private: bool`, `password_salt: [u8; 16]`, `password_hash: [u8; 64]`. Append them. Do not reorder `Game`. `INIT_SPACE` goes from 120 to 201. Account data length is 209 (`8 + 201`). Public means `is_private = false` and both arrays zero. Do not use `Option`.
+- `Game` account data is publicly readable. Anyone can copy the salt and hash and brute-force offline. Mitigation is ticket 003's slow salted scrypt plus the 8-character minimum. That is acceptable for casual games and is not strong secrecy. UI and docs must not imply otherwise.
 - Do not realloc existing games and do not add a migration instruction. Reset local state with `just down-clean` before expecting old games to load. Same for devnet games created at 128 bytes.
 - Visibility is fixed at creation. `set_game_password` does not write `is_private`. No "make public" / "make private" control after create.
 - `join_game`'s signature and handler do not change. Do not pass the plaintext password into any instruction.
 - Check order for `set_game_password`: `NotGameAdmin`, then `GameIsNotPrivate`, then `InvalidGamePassword`, then the write. Call `super::close_game::ensure_caller_is_admin`. Do not define another `pub fn ensure_caller_is_admin`.
-- Append the two new errors at the end of `ErrorCode`. On `main` today the next codes are `6015` / `0x177F` and `6016` / `0x1780`. If ticket 010 has already appended `CannotTransferAdminToSelf`, append after that instead. Never insert in the middle.
+- Append the two new errors after ticket 010's `CannotTransferAdminToSelf` (`6015` / `0x177F`). #40 is expected to merge first, so `InvalidGamePassword` is `6016` / `0x1780` and `GameIsNotPrivate` is `6017` / `0x1781`. Never insert in the middle. If `errors.rs` still ends at `GameNotInRegistry`, do not commit these two at `6015` / `6016`; put them after `CannotTransferAdminToSelf` before writing the client pin.
+- Match program errors by name. On-chain e2e uses `isGameTokenWalletError` with the generated constant. Server tests mock `GAME_TOKEN_WALLET_ERROR__INVALID_GAME_PASSWORD` and `GAME_TOKEN_WALLET_ERROR__GAME_IS_NOT_PRIVATE` and assert the mapped message. The only numeric pin is `apps/on-chain-client/src/index.test.ts`, written at implementation time for `0x1780` and `0x1781` (and the two predecessors `0x177f` and `0x177e`). Do not pin an interim numbering.
+- The password rule (length, charset, wrong password, correct password) is tested in Server Action unit tests and Playwright. On-chain e2e checks stored bytes and program errors only. It does not run scrypt or `validatePassword`.
 - Trust model: the system wallet signs every transaction. "Only the current admin" means `getCurrentUsername()` resolves to the `User` PDA equal to `game.admin`. The caller username is never a request field.
 - Join server order: not signed in, game not found, already a member, full (20), then the password check, then the existing send. No dummy scrypt on game-not-found. Public joins ignore a password argument.
 - Auto-join at creation does not check the password and does not call `join_game`. An admin who is not a member is not exempt on a later join.
@@ -240,19 +243,19 @@ Expected: PASS.
 
 - [ ] **Step 1: Append the errors**
 
-After `GameNotInRegistry`:
+Append after `CannotTransferAdminToSelf`. #40 is expected to merge first, so these are `6016` / `0x1780` and `6017` / `0x1781`. If `errors.rs` still ends at `GameNotInRegistry`, add 010's variant (or rebase onto it) before this step. Do not leave the two new variants at `6015` / `6016`.
 
 ```rust
-    #[msg("Game was not found in the registry's active-games list")]
-    GameNotInRegistry,
+    #[msg("Cannot transfer the admin role to yourself")]
+    CannotTransferAdminToSelf, // ticket 010, 6015 / 0x177F — append after this
     #[msg("A private game's password salt and hash must each contain a non-zero byte, and a public game's must each be all zeros")]
-    InvalidGamePassword,
+    InvalidGamePassword, // 6016 / 0x1780
     #[msg("Only a private game has a password")]
-    GameIsNotPrivate,
+    GameIsNotPrivate, // 6017 / 0x1781
 }
 ```
 
-If a variant already follows `GameNotInRegistry`, append after the last one. Do not renumber.
+Do not insert above an existing variant. Do not edit 010's message.
 
 - [ ] **Step 2: Thread the arguments through `create_game`**
 
@@ -337,17 +340,28 @@ Expected: PASS. `join_game.rs` has no diff.
 
 - [ ] **Step 1: Extend the client export test so it fails**
 
-Import the new builder and the two error constants. Assert the builder is a function and both constants are numbers. Assert `GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY` is still `0x177e` when the new variants were appended directly after it.
+Import the new builder and the two error constants. Assert the builder is a function and both constants are numbers. Do not assert `0x1780` or `0x1781` in this red step.
 
 Run: `pnpm --filter on-chain-client run test`
 Expected: FAIL — the exports are missing.
 
-- [ ] **Step 2: Codegen**
+- [ ] **Step 2: Codegen, then the numeric pin**
 
 From `apps/on-chain-program`: `anchor build`
 Then: `pnpm --filter on-chain-client run codegen`
 
-Expected: `src/generated/instructions/setGamePassword.ts` exists. Create-game data has `isPrivate`, `passwordSalt` (16), `passwordHash` (64) and no password string. On today's enum the new codes are `0x177f` and `0x1780`.
+Expected: `src/generated/instructions/setGamePassword.ts` exists. Create-game data has `isPrivate`, `passwordSalt` (16), `passwordHash` (64) and no password string. Those two byte arrays are the `Game` account fields.
+
+This file is the only numeric pin, written here at implementation time against the final numbering (design.md D4), the same kind of pin as ticket 010's `0x177f` check. `CannotTransferAdminToSelf` is already in the generated enum:
+
+```ts
+expect(GAME_TOKEN_WALLET_ERROR__INVALID_GAME_PASSWORD).toBe(0x1780);
+expect(GAME_TOKEN_WALLET_ERROR__GAME_IS_NOT_PRIVATE).toBe(0x1781);
+expect(GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF).toBe(0x177f);
+expect(GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY).toBe(0x177e);
+```
+
+Do not also pin `0x177f` / `0x1780`. No other test asserts these numbers.
 
 - [ ] **Step 3: Public args at existing create call sites**
 
@@ -384,6 +398,10 @@ Expected: PASS. Frontend `createGame` still fails typecheck until Task 5; that i
 - Consumes: `getCreateGameInstructionAsync`, `getSetGamePasswordInstructionAsync`, `getJoinGameInstructionAsync`. Copy `fundedAdmin`, `buildAndSend`, `registeredAdmin`, and the shared-signer rule from `mint_to_player.test.ts`.
 
 Use a distinct username suffix and `gameId` fill byte per test. Timeouts `30_000`.
+
+This file does not test the password rule. Pass raw salt and hash bytes. Do not call `validatePassword`, do not run scrypt, and do not expect "Incorrect password." Wrong, empty, and illegal passwords, and a correct password accepted by the server, are Task 5 and Task 7.
+
+Match each program error with `isGameTokenWalletError(unwrapSimulationError(error), transactionMessage, code)`, the same catch shape as `create_game.test.ts`. `code` is the generated constant (`GAME_TOKEN_WALLET_ERROR__INVALID_GAME_PASSWORD`, `GAME_TOKEN_WALLET_ERROR__GAME_IS_NOT_PRIVATE`, `GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN`, `GAME_TOKEN_WALLET_ERROR__GAME_FULL`). Do not pass `0x1780`, `6016`, or any other numeric literal. The numeric pin is Task 3.
 
 - [ ] **Step 1: Write the cases**
 
@@ -462,7 +480,9 @@ vi.mock("../password", () => ({
 }));
 ```
 
-`mockHashPassword` resolves `{ salt: FIXED_SALT, hash: FIXED_HASH }` with `FIXED_SALT` a 16-byte `Uint8Array` of `3`s and `FIXED_HASH` a 64-byte `Uint8Array` of `4`s. Add the two new error codes to the `on-chain-client` mock (`0x177f` and `0x1780` when appended after `GameNotInRegistry`). Extend `gameData()` with `isPrivate: false`, `passwordSalt: new Uint8Array(16)`, `passwordHash: new Uint8Array(64)` so existing fetches still typecheck.
+`mockHashPassword` resolves `{ salt: FIXED_SALT, hash: FIXED_HASH }` with `FIXED_SALT` a 16-byte `Uint8Array` of `3`s and `FIXED_HASH` a 64-byte `Uint8Array` of `4`s. Add `GAME_TOKEN_WALLET_ERROR__INVALID_GAME_PASSWORD` and `GAME_TOKEN_WALLET_ERROR__GAME_IS_NOT_PRIVATE` to the `on-chain-client` mock as two distinct numbers. Mapping tests turn `isGameTokenWalletError` on for that named constant and expect the message. Those mock numbers are not a pin; do not assert `0x1780` or `0x1781` in this file. Extend `gameData()` with `isPrivate: false`, `passwordSalt: new Uint8Array(16)`, `passwordHash: new Uint8Array(64)` so existing fetches still typecheck.
+
+These tests, with Task 7, are the password-rule coverage. On-chain e2e does not duplicate them.
 
 Tests, written before the behavior exists:
 
@@ -585,6 +605,8 @@ Expected: PASS.
 
 - [ ] **Step 1: Write the flow**
 
+This Playwright flow, with the Server Action tests, is where the password rule is tested. The on-chain e2e does not cover wrong or correct passwords.
+
 Follow `game-joining.spec.ts`: `uniqueUsername`, `registerAndLogin` with login password `Abcdef123!`. Game password is `TablePass1!` and the replacement is `TablePass2!`. Both pass `validatePassword` and neither equals the login password.
 
 1. Host registers, opens `/games/new`, fills the name `E2E Private Game`, clicks `Private`, fills the game password, clicks `Create game`. Lands on `/`. Home row contains the name, `Private`, and `Admin`.
@@ -619,12 +641,15 @@ Confirm there is no `realloc` constraint and no migrate instruction. If a local 
 
 ## Scenario coverage
 
+The password rule (empty, too short, charset, wrong password, correct password) is the server and Playwright rows. On-chain e2e rows check bytes on the `Game` account and program errors. They do not stand in for the password rule. Program errors in the on-chain and server rows are matched by name. The numeric codes appear only in the client pin.
+
 | Spec scenario | Layer | Task |
 |---|---|---|
 | Successful public creation, zeros stored | on-chain e2e | 4.1, existing `create_game.test.ts` |
 | Creator is a player with no `join_game`, public or private | on-chain e2e + Playwright | 4.1, 7.1 |
 | New account is 209 bytes | on-chain e2e | 4.1 |
 | Private create stores the exact salt and hash | on-chain e2e + server (mocked hash bytes) | 4.1, 5.2 |
+| Salt and hash live on the Game account | on-chain e2e | 4.1 |
 | Public create with a non-zero hash writes nothing | on-chain e2e | 4.2 |
 | Private create with a zero hash writes nothing | on-chain e2e | 4.2 |
 | Empty / charset / length rejected on create | server + component | 5.2, 6.2 |
@@ -663,4 +688,4 @@ Confirm there is no `realloc` constraint and no migrate instruction. If a local 
 | Non-admin does not see Admin controls | component + Playwright | 6.2, 7.1 |
 | Success refreshes in place; error keeps the modal open | component | 6.2 |
 | Public join still has no password (regression) | existing on-chain e2e + existing Playwright | 3.3, 7.1 |
-| New error codes, predecessor unchanged | client unit | 3.1 |
+| New error codes, predecessor unchanged | client unit (the only numeric pin, final numbering) | 3.1 |

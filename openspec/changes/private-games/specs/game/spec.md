@@ -14,7 +14,11 @@ The system SHALL allow a logged-in user to create a game with a name, defaulting
 ## ADDED Requirements
 
 ### Requirement: Game password fields
-The system SHALL store a game's privacy in three fields appended after `player_count`, so every field that already exists keeps its offset: `is_private: bool`, `password_salt: [u8; 16]`, and `password_hash: [u8; 64]`. The salt and hash widths match `User`'s `SALT_BYTES` and `PASSWORD_HASH_BYTES`. `Game::INIT_SPACE` is 201 (120 today, plus 81). A public game has `is_private` false and both arrays all zeros. A private game has `is_private` true and both arrays non-zero. The plaintext password is not a field. This change does not realloc a `Game` account that was created at the previous size.
+The system SHALL store each game's password material in that game's own `Game` account data — the PDA seeded `["game", game_id]` — and SHALL NOT store it in a second account or off-chain. The fields are appended after `player_count`, so every field that already exists keeps its offset: `is_private: bool` (1 byte), `password_salt: [u8; 16]` (the per-game scrypt salt), and `password_hash: [u8; 64]` (the per-game scrypt hash). Those widths match `User`'s `SALT_BYTES` and `PASSWORD_HASH_BYTES`. `Game::INIT_SPACE` is 201 (120 today, plus 81). A public game has `is_private` false and both arrays all zeros. A private game has `is_private` true and both arrays non-zero. The plaintext password is not a field. This change does not realloc a `Game` account that was created at the previous size.
+
+#### Scenario: Salt and hash live on the Game account
+- **WHEN** a private game is created with a non-zero salt and a non-zero hash
+- **THEN** those bytes are the `password_salt` and `password_hash` fields of that `Game` account, 16 bytes and 64 bytes, and no other account holds them
 
 #### Scenario: New games allocate the larger account
 - **WHEN** a game is created
