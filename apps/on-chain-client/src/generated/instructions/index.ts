@@ -14,4 +14,5 @@ export * from "./initializeRegistry";
 export * from "./joinGame";
 export * from "./mintToPlayer";
 export * from "./quitGame";
+export * from "./transferGameAdmin";
 export * from "./transferToken";

@@ -92,6 +92,8 @@ describe("GameDetailPage", () => {
     const jsx = await GameDetailPage({ params: Promise.resolve({ address: "Game1" }) });
     render(jsx);
     expect(screen.queryByRole("button", { name: "Admin controls" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("New admin")).not.toBeInTheDocument();
+    expect(screen.queryByText("Transfer admin role")).not.toBeInTheDocument();
   });
 
   it("shows the Send tokens form for a General Mode game, for any member (not just the admin)", async () => {

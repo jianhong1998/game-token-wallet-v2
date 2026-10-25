@@ -25,6 +25,7 @@ import {
   parseJoinGameInstruction,
   parseMintToPlayerInstruction,
   parseQuitGameInstruction,
+  parseTransferGameAdminInstruction,
   parseTransferTokenInstruction,
   type ParsedCloseGameInstruction,
   type ParsedCloseGamePlayerInstruction,
@@ -34,6 +35,7 @@ import {
   type ParsedJoinGameInstruction,
   type ParsedMintToPlayerInstruction,
   type ParsedQuitGameInstruction,
+  type ParsedTransferGameAdminInstruction,
   type ParsedTransferTokenInstruction,
 } from "../instructions";
 
@@ -97,6 +99,7 @@ export enum GameTokenWalletInstruction {
   JoinGame,
   MintToPlayer,
   QuitGame,
+  TransferGameAdmin,
   TransferToken,
 }
 
@@ -196,6 +199,17 @@ export function identifyGameTokenWalletInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([81, 204, 16, 117, 195, 90, 193, 222]),
+      ),
+      0,
+    )
+  ) {
+    return GameTokenWalletInstruction.TransferGameAdmin;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([219, 17, 122, 53, 237, 171, 232, 222]),
       ),
       0,
@@ -235,6 +249,9 @@ export type ParsedGameTokenWalletInstruction<
   | ({
       instructionType: GameTokenWalletInstruction.QuitGame;
     } & ParsedQuitGameInstruction<TProgram>)
+  | ({
+      instructionType: GameTokenWalletInstruction.TransferGameAdmin;
+    } & ParsedTransferGameAdminInstruction<TProgram>)
   | ({
       instructionType: GameTokenWalletInstruction.TransferToken;
     } & ParsedTransferTokenInstruction<TProgram>);
@@ -298,6 +315,13 @@ export function parseGameTokenWalletInstruction<TProgram extends string>(
       return {
         instructionType: GameTokenWalletInstruction.QuitGame,
         ...parseQuitGameInstruction(instruction),
+      };
+    }
+    case GameTokenWalletInstruction.TransferGameAdmin: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: GameTokenWalletInstruction.TransferGameAdmin,
+        ...parseTransferGameAdminInstruction(instruction),
       };
     }
     case GameTokenWalletInstruction.TransferToken: {

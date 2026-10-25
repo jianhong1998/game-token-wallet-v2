@@ -44,10 +44,13 @@ export const GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME = 0x177c; // 6012
 export const GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY = 0x177d; // 6013
 /** GameNotInRegistry: Game was not found in the registry's active-games list */
 export const GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY = 0x177e; // 6014
+/** CannotTransferAdminToSelf: Cannot transfer the admin role to yourself */
+export const GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF = 0x177f; // 6015
 
 export type GameTokenWalletError =
   | typeof GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME
   | typeof GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME
+  | typeof GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF
   | typeof GAME_TOKEN_WALLET_ERROR__GAME_FULL
   | typeof GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY
   | typeof GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY
@@ -68,6 +71,7 @@ if (process.env.NODE_ENV !== "production") {
   gameTokenWalletErrorMessages = {
     [GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME]: `The game's admin cannot quit their own game`,
     [GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME]: `You are already a player in this game`,
+    [GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF]: `Cannot transfer the admin role to yourself`,
     [GAME_TOKEN_WALLET_ERROR__GAME_FULL]: `Game already has the maximum of 20 players`,
     [GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY]: `Cannot close a game that still has players — close every player first`,
     [GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY]: `Game was not found in the registry's active-games list`,

@@ -22,6 +22,7 @@ import {
   getCreateGameInstructionAsync,
   getJoinGameInstructionAsync,
   getMintToPlayerInstructionAsync,
+  getTransferGameAdminInstructionAsync,
   getTransferTokenInstructionAsync,
   getQuitGameInstructionAsync,
   getCloseGamePlayerInstructionAsync,
@@ -32,7 +33,9 @@ import {
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME,
   GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN,
   GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+  GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA,
   GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT,
+  GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF,
   GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER,
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
   GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME,
@@ -186,9 +189,7 @@ export interface DepositToPlayerInput {
 
 export type DepositToPlayerResult = { ok: true } | { ok: false; error: string };
 
-export async function depositToPlayer(
-  input: DepositToPlayerInput,
-): Promise<DepositToPlayerResult> {
+export async function depositToPlayer(input: DepositToPlayerInput): Promise<DepositToPlayerResult> {
   const username = await getCurrentUsername();
   if (!username) {
     return { ok: false, error: "Not signed in" };
@@ -270,11 +271,7 @@ export async function depositToPlayer(
       return { ok: false, error: "Only the game's admin can deposit tokens" };
     }
     if (
-      isGameTokenWalletError(
-        cause,
-        transactionMessage,
-        GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
-      )
+      isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
     ) {
       return { ok: false, error: "That player hasn't joined this game" };
     }
@@ -293,6 +290,97 @@ export async function depositToPlayer(
   return { ok: true };
 }
 
+export interface TransferGameAdminInput {
+  gameAddress: string;
+  playerUsername: string;
+}
+
+export type TransferGameAdminResult = { ok: true } | { ok: false; error: string };
+
+export async function transferGameAdmin(
+  input: TransferGameAdminInput,
+): Promise<TransferGameAdminResult> {
+  const username = await getCurrentUsername();
+  if (!username) {
+    return { ok: false, error: "Not signed in" };
+  }
+  if (!input.playerUsername) {
+    return { ok: false, error: "Select a player" };
+  }
+  if (input.playerUsername === username) {
+    return { ok: false, error: "Cannot transfer the admin role to yourself" };
+  }
+
+  const { rpc, rpcSubscriptions, adminSigner, programAddress } = await getSolanaContext();
+  const game = await fetchMaybeGame(rpc, input.gameAddress as Address);
+  if (!game.exists) {
+    return { ok: false, error: "Game not found" };
+  }
+
+  const [playerUserAddress] = await findUserPda(
+    { username: input.playerUsername, admin: adminSigner.address },
+    { programAddress },
+  );
+  const [playerAta] = await findAssociatedTokenPda({
+    owner: playerUserAddress,
+    mint: game.data.mint,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+
+  // Caller identity is the session username only. Extra fields on the request
+  // (a spoofed `username`) are ignored; the instruction's `user` PDA is this value.
+  const transferInstruction = await getTransferGameAdminInstructionAsync(
+    {
+      admin: adminSigner,
+      username,
+      gameId: game.data.gameId,
+      playerUsername: input.playerUsername,
+      playerAta,
+    },
+    { programAddress },
+  );
+
+  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+  const transactionMessage = pipe(
+    createTransactionMessage({ version: 0 }),
+    (tx) => setTransactionMessageFeePayerSigner(adminSigner, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+    (tx) => appendTransactionMessageInstructions([transferInstruction], tx),
+  );
+  try {
+    await signAndSendTransaction(transactionMessage, { rpc, rpcSubscriptions });
+  } catch (error) {
+    const cause = unwrapSimulationError(error);
+    if (
+      isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN)
+    ) {
+      return { ok: false, error: "Only the game's admin can transfer the admin role" };
+    }
+    if (
+      isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
+    ) {
+      return { ok: false, error: "That player hasn't joined this game" };
+    }
+    if (
+      isGameTokenWalletError(
+        cause,
+        transactionMessage,
+        GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF,
+      )
+    ) {
+      return { ok: false, error: "Cannot transfer the admin role to yourself" };
+    }
+    if (
+      isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA)
+    ) {
+      return { ok: false, error: "That player's token account is invalid" };
+    }
+    throw error;
+  }
+
+  return { ok: true };
+}
+
 export interface TransferRecipientInput {
   recipientUsername: string;
   amount: number;
@@ -304,8 +392,7 @@ export interface TransferTokensInput {
 }
 
 export type TransferTokensResult =
-  | { ok: true }
-  | { ok: false; error: string; transfersApplied: number; transfersTotal: number };
+  { ok: true } | { ok: false; error: string; transfersApplied: number; transfersTotal: number };
 
 export async function transferTokens(input: TransferTokensInput): Promise<TransferTokensResult> {
   const transfersTotal = input.recipients.length;
@@ -444,14 +531,24 @@ export async function transferTokens(input: TransferTokensInput): Promise<Transf
     } catch (error) {
       const cause = unwrapSimulationError(error);
       let friendly: string;
-      if (isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER)) {
+      if (
+        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER)
+      ) {
         friendly = "Cannot transfer tokens to yourself";
       } else if (
-        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT)
+        isGameTokenWalletError(
+          cause,
+          transactionMessage,
+          GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
+        )
       ) {
         friendly = "Amount must be greater than zero";
       } else if (
-        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
+        isGameTokenWalletError(
+          cause,
+          transactionMessage,
+          GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+        )
       ) {
         friendly = "That player hasn't joined this game";
       } else if (
@@ -521,11 +618,7 @@ export async function quitGame(gameAddress: string): Promise<QuitGameResult> {
       return { ok: false, error: "Transfer admin role to another player before quitting" };
     }
     if (
-      isGameTokenWalletError(
-        cause,
-        transactionMessage,
-        GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
-      )
+      isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
     ) {
       return { ok: false, error: "You are not a player in this game" };
     }
@@ -736,8 +829,7 @@ export async function fetchGameDetail(gameAddress: string): Promise<GameDetail |
 }
 
 export type CloseGameResult =
-  | { ok: true }
-  | { ok: false; error: string; playersClosed: number; playersTotal: number };
+  { ok: true } | { ok: false; error: string; playersClosed: number; playersTotal: number };
 
 export async function closeGame(gameAddress: string): Promise<CloseGameResult> {
   const username = await getCurrentUsername();
@@ -789,10 +881,16 @@ export async function closeGame(gameAddress: string): Promise<CloseGameResult> {
     } catch (error) {
       const cause = unwrapSimulationError(error);
       let friendly: string;
-      if (isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN)) {
+      if (
+        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN)
+      ) {
         friendly = "You are no longer this game's admin";
       } else if (
-        isGameTokenWalletError(cause, transactionMessage, GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME)
+        isGameTokenWalletError(
+          cause,
+          transactionMessage,
+          GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME,
+        )
       ) {
         friendly = "That player is no longer in the game — please try again";
       } else {
@@ -819,7 +917,11 @@ export async function closeGame(gameAddress: string): Promise<CloseGameResult> {
   } catch (error) {
     const cause = unwrapSimulationError(error);
     if (
-      isGameTokenWalletError(cause, finalTransactionMessage, GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY)
+      isGameTokenWalletError(
+        cause,
+        finalTransactionMessage,
+        GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY,
+      )
     ) {
       return {
         ok: false,

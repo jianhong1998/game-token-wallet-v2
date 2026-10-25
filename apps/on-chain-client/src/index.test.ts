@@ -28,6 +28,11 @@ import {
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT,
   getQuitGameInstructionAsync,
   GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME,
+  getCloseGameInstructionAsync,
+  GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY,
+  GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY,
+  getTransferGameAdminInstructionAsync,
+  GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF,
 } from "./index";
 
 describe("generated on-chain-client", () => {
@@ -82,5 +87,16 @@ describe("generated on-chain-client", () => {
   it("exports a quit_game instruction builder and its error helper", () => {
     expect(typeof getQuitGameInstructionAsync).toBe("function");
     expect(typeof GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME).toBe("number");
+  });
+
+  it("exports a close_game instruction builder and its error helpers", () => {
+    expect(typeof getCloseGameInstructionAsync).toBe("function");
+    expect(GAME_TOKEN_WALLET_ERROR__GAME_NOT_EMPTY).toBe(0x177d);
+    expect(GAME_TOKEN_WALLET_ERROR__GAME_NOT_IN_REGISTRY).toBe(0x177e);
+  });
+
+  it("exports a transfer_game_admin instruction builder and its error helper", () => {
+    expect(typeof getTransferGameAdminInstructionAsync).toBe("function");
+    expect(GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF).toBe(0x177f);
   });
 });

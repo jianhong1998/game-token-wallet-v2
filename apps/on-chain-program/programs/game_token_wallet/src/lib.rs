@@ -84,4 +84,13 @@ pub mod game_token_wallet {
     pub fn close_game(ctx: Context<CloseGame>, game_id: [u8; 16], username: String) -> Result<()> {
         instructions::game::close_game::handler(ctx, game_id, username)
     }
+
+    pub fn transfer_game_admin(
+        ctx: Context<TransferGameAdmin>,
+        game_id: [u8; 16],
+        username: String,
+        player_username: String,
+    ) -> Result<()> {
+        instructions::game::transfer_game_admin::handler(ctx, game_id, username, player_username)
+    }
 }

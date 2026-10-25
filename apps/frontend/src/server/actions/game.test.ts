@@ -20,6 +20,7 @@ const {
   mockGetCreateGameInstructionAsync,
   mockGetJoinGameInstructionAsync,
   mockGetMintToPlayerInstructionAsync,
+  mockGetTransferGameAdminInstructionAsync,
   mockGetTransferTokenInstructionAsync,
   mockGetQuitGameInstructionAsync,
   mockGetCloseGamePlayerInstructionAsync,
@@ -35,6 +36,7 @@ const {
   mockGetCreateGameInstructionAsync: vi.fn(),
   mockGetJoinGameInstructionAsync: vi.fn(),
   mockGetMintToPlayerInstructionAsync: vi.fn(),
+  mockGetTransferGameAdminInstructionAsync: vi.fn(),
   mockGetTransferTokenInstructionAsync: vi.fn(),
   mockGetQuitGameInstructionAsync: vi.fn(),
   mockGetCloseGamePlayerInstructionAsync: vi.fn(),
@@ -52,7 +54,9 @@ const {
   ALREADY_JOINED_GAME_CODE,
   NOT_GAME_ADMIN_CODE,
   PLAYER_NOT_IN_GAME_CODE,
+  INVALID_PLAYER_ATA_CODE,
   INVALID_DEPOSIT_AMOUNT_CODE,
+  CANNOT_TRANSFER_ADMIN_TO_SELF_CODE,
   SELF_TRANSFER_CODE,
   INVALID_TRANSFER_AMOUNT_CODE,
   ADMIN_CANNOT_QUIT_GAME_CODE,
@@ -62,7 +66,9 @@ const {
   ALREADY_JOINED_GAME_CODE: 0x1775,
   NOT_GAME_ADMIN_CODE: 0x1777,
   PLAYER_NOT_IN_GAME_CODE: 0x1778,
+  INVALID_PLAYER_ATA_CODE: 0x1776,
   INVALID_DEPOSIT_AMOUNT_CODE: 0x1779,
+  CANNOT_TRANSFER_ADMIN_TO_SELF_CODE: 0x177f,
   SELF_TRANSFER_CODE: 0x177a,
   INVALID_TRANSFER_AMOUNT_CODE: 0x177b,
   ADMIN_CANNOT_QUIT_GAME_CODE: 0x177c,
@@ -77,6 +83,7 @@ vi.mock("on-chain-client", () => ({
   getCreateGameInstructionAsync: mockGetCreateGameInstructionAsync,
   getJoinGameInstructionAsync: mockGetJoinGameInstructionAsync,
   getMintToPlayerInstructionAsync: mockGetMintToPlayerInstructionAsync,
+  getTransferGameAdminInstructionAsync: mockGetTransferGameAdminInstructionAsync,
   getTransferTokenInstructionAsync: mockGetTransferTokenInstructionAsync,
   getQuitGameInstructionAsync: mockGetQuitGameInstructionAsync,
   getCloseGamePlayerInstructionAsync: mockGetCloseGamePlayerInstructionAsync,
@@ -87,7 +94,9 @@ vi.mock("on-chain-client", () => ({
   GAME_TOKEN_WALLET_ERROR__ALREADY_JOINED_GAME: ALREADY_JOINED_GAME_CODE,
   GAME_TOKEN_WALLET_ERROR__NOT_GAME_ADMIN: NOT_GAME_ADMIN_CODE,
   GAME_TOKEN_WALLET_ERROR__PLAYER_NOT_IN_GAME: PLAYER_NOT_IN_GAME_CODE,
+  GAME_TOKEN_WALLET_ERROR__INVALID_PLAYER_ATA: INVALID_PLAYER_ATA_CODE,
   GAME_TOKEN_WALLET_ERROR__INVALID_DEPOSIT_AMOUNT: INVALID_DEPOSIT_AMOUNT_CODE,
+  GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF: CANNOT_TRANSFER_ADMIN_TO_SELF_CODE,
   GAME_TOKEN_WALLET_ERROR__SELF_TRANSFER: SELF_TRANSFER_CODE,
   GAME_TOKEN_WALLET_ERROR__INVALID_TRANSFER_AMOUNT: INVALID_TRANSFER_AMOUNT_CODE,
   GAME_TOKEN_WALLET_ERROR__ADMIN_CANNOT_QUIT_GAME: ADMIN_CANNOT_QUIT_GAME_CODE,
@@ -108,7 +117,9 @@ vi.mock("@solana-program/token", () => ({
   TOKEN_PROGRAM_ADDRESS: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 }));
 
-const { mockChunkInstructionsBySize } = vi.hoisted(() => ({ mockChunkInstructionsBySize: vi.fn() }));
+const { mockChunkInstructionsBySize } = vi.hoisted(() => ({
+  mockChunkInstructionsBySize: vi.fn(),
+}));
 vi.mock("./transfer-chunking", () => ({ chunkInstructionsBySize: mockChunkInstructionsBySize }));
 
 const { mockFetchEncodedAccount } = vi.hoisted(() => ({ mockFetchEncodedAccount: vi.fn() }));
@@ -126,7 +137,9 @@ import {
   createGame,
   joinGame,
   depositToPlayer,
+  transferGameAdmin,
   transferTokens,
+  type TransferGameAdminInput,
   quitGame,
   closeGame,
   listBrowseGames,
@@ -526,7 +539,11 @@ describe("listMyMemberGames", () => {
     mockFetchMaybeRegistry.mockResolvedValue({
       exists: true,
       address: REGISTRY_ADDRESS,
-      data: { discriminator: new Uint8Array(8), bump: 255, activeGames: ["Game1", "Game2", "Game3"] },
+      data: {
+        discriminator: new Uint8Array(8),
+        bump: 255,
+        activeGames: ["Game1", "Game2", "Game3"],
+      },
     });
     mockFetchGame
       .mockResolvedValueOnce({
@@ -846,6 +863,129 @@ describe("depositToPlayer", () => {
   });
 });
 
+describe("transferGameAdmin", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCurrentUsername.mockResolvedValue("hostadmin");
+    mockGetSolanaContext.mockResolvedValue({
+      rpc: {
+        getLatestBlockhash: () => ({
+          send: async () => ({ value: { blockhash: "fake", lastValidBlockHeight: 1n } }),
+        }),
+      },
+      rpcSubscriptions: {},
+      adminSigner: { address: ADMIN_ADDRESS },
+      programAddress: PROGRAM_ADDRESS,
+    });
+    mockFetchMaybeGame.mockResolvedValue({
+      exists: true,
+      address: GAME_ADDRESS,
+      data: gameData({ mint: MINT_ADDRESS }),
+    });
+    mockFindUserPda.mockResolvedValue([USER_ADDRESS, 255]);
+    mockFindAssociatedTokenPda.mockResolvedValue([PLAYER_ATA_ADDRESS, 254]);
+    mockGetTransferGameAdminInstructionAsync.mockResolvedValue({
+      programAddress: PROGRAM_ADDRESS,
+      accounts: [],
+      data: new Uint8Array(),
+    });
+    mockSignAndSendTransaction.mockResolvedValue(undefined);
+    mockIsGameTokenWalletError.mockReturnValue(false);
+  });
+
+  it("rejects when not signed in, without touching the chain", async () => {
+    mockGetCurrentUsername.mockResolvedValue(null);
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "bob" }),
+    ).resolves.toEqual({ ok: false, error: "Not signed in" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty target before touching the chain", async () => {
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "" }),
+    ).resolves.toEqual({ ok: false, error: "Select a player" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects a self-transfer before touching the chain", async () => {
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "hostadmin" }),
+    ).resolves.toEqual({ ok: false, error: "Cannot transfer the admin role to yourself" });
+    expect(mockGetSolanaContext).not.toHaveBeenCalled();
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the game doesn't exist, without sending a transaction", async () => {
+    mockFetchMaybeGame.mockResolvedValue({ exists: false });
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "bob" }),
+    ).resolves.toEqual({ ok: false, error: "Game not found" });
+    expect(mockSignAndSendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sends the transfer using the session username even if the request names another caller", async () => {
+    await expect(
+      transferGameAdmin({
+        gameAddress: GAME_ADDRESS,
+        playerUsername: "bob",
+        username: "someoneelse",
+      } as TransferGameAdminInput),
+    ).resolves.toEqual({ ok: true });
+    expect(mockGetTransferGameAdminInstructionAsync).toHaveBeenCalledWith(
+      {
+        admin: { address: ADMIN_ADDRESS },
+        username: "hostadmin",
+        gameId: expect.anything(),
+        playerUsername: "bob",
+        playerAta: PLAYER_ATA_ADDRESS,
+      },
+      { programAddress: PROGRAM_ADDRESS },
+    );
+    expect(mockSignAndSendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps an on-chain NotGameAdmin rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === NOT_GAME_ADMIN_CODE,
+    );
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "bob" }),
+    ).resolves.toEqual({ ok: false, error: "Only the game's admin can transfer the admin role" });
+  });
+
+  it("maps an on-chain PlayerNotInGame rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === PLAYER_NOT_IN_GAME_CODE,
+    );
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "bob" }),
+    ).resolves.toEqual({ ok: false, error: "That player hasn't joined this game" });
+  });
+
+  it("maps an on-chain CannotTransferAdminToSelf rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === CANNOT_TRANSFER_ADMIN_TO_SELF_CODE,
+    );
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "bob" }),
+    ).resolves.toEqual({ ok: false, error: "Cannot transfer the admin role to yourself" });
+  });
+
+  it("maps an on-chain InvalidPlayerAta rejection to the friendly message", async () => {
+    mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === INVALID_PLAYER_ATA_CODE,
+    );
+    await expect(
+      transferGameAdmin({ gameAddress: GAME_ADDRESS, playerUsername: "bob" }),
+    ).resolves.toEqual({ ok: false, error: "That player's token account is invalid" });
+  });
+});
+
 describe("transferTokens", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -881,8 +1021,16 @@ describe("transferTokens", () => {
   it("rejects when not signed in, without touching the chain", async () => {
     mockGetCurrentUsername.mockResolvedValue(null);
     await expect(
-      transferTokens({ gameAddress: GAME_ADDRESS, recipients: [{ recipientUsername: "bob", amount: 5 }] }),
-    ).resolves.toEqual({ ok: false, error: "Not signed in", transfersApplied: 0, transfersTotal: 1 });
+      transferTokens({
+        gameAddress: GAME_ADDRESS,
+        recipients: [{ recipientUsername: "bob", amount: 5 }],
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: "Not signed in",
+      transfersApplied: 0,
+      transfersTotal: 1,
+    });
     expect(mockGetSolanaContext).not.toHaveBeenCalled();
   });
 
@@ -1051,7 +1199,9 @@ describe("transferTokens", () => {
 
   it("maps an on-chain SelfTransfer rejection (bypassed client-side check) to the friendly message", async () => {
     mockSignAndSendTransaction.mockRejectedValue(new Error("simulation failed"));
-    mockIsGameTokenWalletError.mockImplementation((_error, _tx, code) => code === SELF_TRANSFER_CODE);
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === SELF_TRANSFER_CODE,
+    );
     const result = await transferTokens({
       gameAddress: GAME_ADDRESS,
       recipients: [{ recipientUsername: "bob", amount: 5 }],
@@ -1102,7 +1252,10 @@ describe("transferTokens", () => {
     mockSignAndSendTransaction.mockRejectedValue(new Error("network blip"));
     mockIsGameTokenWalletError.mockReturnValue(false);
     await expect(
-      transferTokens({ gameAddress: GAME_ADDRESS, recipients: [{ recipientUsername: "bob", amount: 5 }] }),
+      transferTokens({
+        gameAddress: GAME_ADDRESS,
+        recipients: [{ recipientUsername: "bob", amount: 5 }],
+      }),
     ).rejects.toThrow("network blip");
   });
 });
@@ -1222,7 +1375,10 @@ describe("closeGame", () => {
     mockFetchMaybeGame.mockResolvedValue({
       exists: true,
       address: GAME_ADDRESS,
-      data: gameData({ mint: MINT_ADDRESS, admin: "HostOwner11111111111111111111111111111111" as Address }),
+      data: gameData({
+        mint: MINT_ADDRESS,
+        admin: "HostOwner11111111111111111111111111111111" as Address,
+      }),
     });
     mockGetTokenDecoder.mockReturnValue({
       decode: vi
@@ -1319,7 +1475,9 @@ describe("closeGame", () => {
     mockSignAndSendTransaction
       .mockResolvedValueOnce(undefined) // player-close chunk succeeds
       .mockRejectedValueOnce(new Error("simulation failed")); // final close fails
-    mockIsGameTokenWalletError.mockImplementation((_error, _tx, code) => code === GAME_NOT_EMPTY_CODE);
+    mockIsGameTokenWalletError.mockImplementation(
+      (_error, _tx, code) => code === GAME_NOT_EMPTY_CODE,
+    );
     await expect(closeGame(GAME_ADDRESS)).resolves.toEqual({
       ok: false,
       error: "A player joined or was paid while closing — please try again",
@@ -1366,7 +1524,10 @@ describe("closeGame", () => {
     mockFetchMaybeGame.mockResolvedValue({
       exists: true,
       address: GAME_ADDRESS,
-      data: gameData({ mint: MINT_ADDRESS, admin: "HostOwner11111111111111111111111111111111" as Address }),
+      data: gameData({
+        mint: MINT_ADDRESS,
+        admin: "HostOwner11111111111111111111111111111111" as Address,
+      }),
     });
     mockGetTokenDecoder.mockReturnValue({
       decode: vi
