@@ -25,20 +25,24 @@ devnet deploy with env-controlled program ID. Not yet discussed:
 
 PRD: private games are visible to all users but password-protected; only
 game admin can set/change it; password stored as hash in game account data.
-Not yet discussed:
 
-- Does changing a private game's password affect already-joined players
-  (presumably no — it only gates _new_ joins), and does this need explicit
-  confirmation?
-- Hashing algorithm choice for both user login password and game password
-  (needs to be computed off-chain by the Next.js server, stored as a raw
-  hash value in account data — algorithm choice itself wasn't discussed,
-  e.g. bcrypt/argon2/sha256+salt).
-- Session/login mechanics after password verification — is there a
-  server-side session (cookie/JWT) after login, or does every sensitive
-  action re-verify? (Likely follows V1's existing pattern — worth checking
-  `user-login.ts` in the current codebase rather than re-deciding from
-  scratch.)
+Resolved by the ticket 007 spec
+([openspec/changes/private-games/](../../openspec/changes/private-games/)).
+Do not treat these as open:
+
+- Changing a private game's password only gates new joins. Players already
+  in the game stay in, and there is no extra confirmation. The admin does
+  not re-enter the old password.
+- Game passwords reuse ticket 003: Node `crypto.scrypt` (N=16384, r=8, p=1),
+  a new 16-byte salt, a 64-byte hash, and `validatePassword` (8–20, the
+  charset in `apps/frontend/src/lib/password-rules.ts`). The Next.js server
+  hashes; the account stores the salt and the hash, not the plaintext.
+- Login session mechanics are ticket 003's cookie session. Joining checks
+  the game password once per join attempt and does not start a second session.
+
+Visibility after creation is also settled there: public vs private is chosen
+on create and is not switched later. A reviewer who wants a later switch
+should say so on the spec PR; the account fields do not preclude it.
 
 ## Deposit / mint conversion
 

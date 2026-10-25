@@ -6,6 +6,9 @@
 
 **Status:** ready-for-agent
 
+**Spec:** [openspec/changes/private-games/](../../openspec/changes/private-games/)
+**Plan:** [docs/superpowers/plans/2026-10-25-private-games.md](../superpowers/plans/2026-10-25-private-games.md)
+
 - [ ] `Game` account stores an optional password hash; public games have none.
 - [ ] Only the game admin can set/change the game's password — enforced on-chain via signer check, not just hidden in the UI.
 - [ ] Private games still appear in the "browse games" list (per PRD) but are visually marked as private.
