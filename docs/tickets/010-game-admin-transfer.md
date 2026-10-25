@@ -6,6 +6,9 @@
 
 **Status:** ready-for-agent
 
+**Spec:** [openspec/changes/game-admin-transfer/](../../openspec/changes/game-admin-transfer/)
+**Plan:** [docs/superpowers/plans/2026-10-25-game-admin-transfer.md](../superpowers/plans/2026-10-25-game-admin-transfer.md)
+
 - [ ] `transfer_game_admin` instruction: only callable by the current admin, target must already be a player in the game, updates the game's stored admin pubkey.
 - [ ] Outgoing admin remains a regular player afterward — not removed from the game.
 - [ ] Admin sees a "transfer admin" action listing current players to choose from; non-admin players don't see this control.
