@@ -67,7 +67,7 @@ Handler order:
 4. ATA initialized → `PlayerNotInGame`.
 5. Write `game.admin`.
 
-Admin is checked before self so a non-admin who names themselves still gets `NotGameAdmin`. The dedicated error is what the current admin gets when the target is their own `User` PDA. Both helpers are pure functions with `#[cfg(test)]` unit tests, same shape as `quit_game.rs`'s `ensure_not_admin` and `mint_to_player.rs`'s `ensure_positive_amount`. The ATA checks and the write are covered by `on-chain-program-e2e`, not by cargo unit tests — they need accounts.
+Admin is checked before self so a non-admin who names themselves still gets `NotGameAdmin`. The dedicated error is what the current admin gets when the target is their own `User` PDA. `ensure_caller_is_admin` is the function already in `close_game.rs` (with its unit tests). `transfer_game_admin` calls it through a private `use super::close_game::ensure_caller_is_admin` and does not declare a second copy — `instructions/game/mod.rs` glob-exports both modules, and a second public function of that name is an `ambiguous_glob_reexports` warning. `ensure_not_self_admin` is new, with `#[cfg(test)]` tests in `transfer_game_admin.rs`, same shape as `quit_game.rs`'s `ensure_not_admin`. The ATA checks and the write are covered by `on-chain-program-e2e`, not by cargo unit tests — they need accounts.
 
 **Alternative considered:** treating self-transfer as a successful no-op. Rejected by the team: it must fail with its own error so a buggy client cannot report success.
 
@@ -99,11 +99,11 @@ The `<select>` lists `players.filter((player) => !player.isAdmin)`. `isAdmin` is
 
 ### D6: Tests, and no CI change
 
-- Cargo: `ensure_caller_is_admin` (equal keys ok, unequal keys err) and `ensure_not_self_admin` (different keys ok, equal keys err) in `transfer_game_admin.rs`.
-- `apps/on-chain-program-e2e/tests/game/transfer_game_admin.test.ts`: one shared system `admin` signer for every user in a test, as `mint_to_player.test.ts` documents. Cover happy path, non-admin, non-member, self-transfer, a deliberately wrong ATA, a missing game account, then the post-transfer split: former admin `quit_game` succeeds and new admin `quit_game` returns `AdminCannotQuitGame`; former admin `mint_to_player` returns `NotGameAdmin` and new admin `mint_to_player` succeeds; former admin `close_game` returns `NotGameAdmin`.
-- Server Action unit tests in `game.test.ts`, colocated, mocking `on-chain-client` the way `depositToPlayer`'s tests do. Add `GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF` (`0x177f`) to that mock.
-- `AdminControlsModal.test.tsx` for the picker, the empty submit, success refresh, and the error slot.
-- Playwright `apps/e2e/tests/general-mode/transfer-admin.spec.ts`, two browser contexts, unique usernames (the e2e stack persists): transfer, balances unchanged, admin label and controls flip, new admin deposits, former admin quits.
+- Cargo: `ensure_caller_is_admin` stays in `close_game.rs` (equal keys ok, unequal keys err). `transfer_game_admin.rs` adds only `ensure_not_self_admin` (different keys ok, equal keys err).
+- `apps/on-chain-program-e2e/tests/game/transfer_game_admin.test.ts`: one shared system `admin` signer for every user in a test, as `mint_to_player.test.ts` documents. Cover happy path, non-admin, non-member, a player who already quit, self-transfer, a wrong ATA in the same game, the target's ATA from another game, a missing game account, a chained A→B→C transfer where A is then `NotGameAdmin`, then the post-transfer split: former admin `quit_game` succeeds and new admin `quit_game` returns `AdminCannotQuitGame`; former admin `mint_to_player` returns `NotGameAdmin` and new admin `mint_to_player` succeeds; former admin `close_game` returns `NotGameAdmin` and the new admin's `close_game` on a non-empty game returns `GameNotEmpty`.
+- Server Action unit tests in `game.test.ts`, colocated, mocking `on-chain-client` the way `depositToPlayer`'s tests do. Add `GAME_TOKEN_WALLET_ERROR__CANNOT_TRANSFER_ADMIN_TO_SELF` (`0x177f`) to that mock. An extra caller `username` on the input is ignored; the instruction username is the session.
+- `AdminControlsModal.test.tsx` for the picker, the empty submit, success refresh, and the error slot. `page.test.tsx` asserts a non-admin viewer does not render the transfer form.
+- Playwright `apps/e2e/tests/general-mode/transfer-admin.spec.ts`, two browser contexts, unique usernames (the e2e stack persists): transfer, balances unchanged, admin label and controls flip without leaving the game URL, the new admin sees them on reload, new admin deposits, former admin quits.
 - `apps/on-chain-client/src/index.test.ts` asserts `getTransferGameAdminInstructionAsync` and the new error constant after codegen.
 - Do not edit CircleCI config.
 

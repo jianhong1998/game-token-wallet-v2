@@ -25,7 +25,7 @@
 - One shared system `admin: KeyPairSigner` per on-chain e2e test, for the host and every other user. `transfer_game_admin` derives both `user` and `player_user` from that signer, same as `mint_to_player`. A per-user random keypair fails with `AccountNotInitialized` (custom program error 3012) before the handler runs. See the DEVIATION comment in `apps/on-chain-program-e2e/tests/game/mint_to_player.test.ts`.
 - No CircleCI changes.
 - Out of scope: kick player (`docs/business-related/003-roadmap.md`) and private-game passwords (ticket 007).
-- TDD: failing test first, then the code that makes it pass. Rust unit tests are inline `#[cfg(test)]` and cover only the pure helpers. ATA checks, the write, and the quit/mint/close follow-on are `on-chain-program-e2e`.
+- TDD: failing test first, then the code that makes it pass. Rust unit tests are inline `#[cfg(test)]` and cover only pure helpers. `ensure_caller_is_admin` already exists in `close_game.rs` with its own tests — call that function, do not declare another copy. The new helper is `ensure_not_self_admin` only. ATA checks, the write, and the quit/mint/close follow-on are `on-chain-program-e2e`.
 
 ---
 
@@ -62,7 +62,8 @@ Modified files:
 
 **Interfaces:**
 - Consumes: `Game.admin: Pubkey`, `Game.mint: Pubkey`, `Game.bump` (`state/game.rs`); `User`; `ErrorCode::{NotGameAdmin, InvalidPlayerAta, PlayerNotInGame}`.
-- Produces: `transfer_game_admin(ctx, game_id: [u8; 16], username: String, player_username: String) -> Result<()>`; `ErrorCode::CannotTransferAdminToSelf`; `pub fn ensure_caller_is_admin(user: Pubkey, game_admin: Pubkey) -> Result<()>`; `pub fn ensure_not_self_admin(user: Pubkey, player_user: Pubkey) -> Result<()>`.
+- Consumes: `close_game::ensure_caller_is_admin` (already tested in `close_game.rs`). Do not add a second definition. `close_game_player.rs` already has its own copy of that name; a third `pub fn` glob-exported from `instructions/game/mod.rs` trips `ambiguous_glob_reexports`.
+- Produces: `transfer_game_admin(ctx, game_id: [u8; 16], username: String, player_username: String) -> Result<()>`; `ErrorCode::CannotTransferAdminToSelf`; `pub fn ensure_not_self_admin(user: Pubkey, player_user: Pubkey) -> Result<()>`.
 
 - [ ] **Step 1: Append the error variant**
 
@@ -87,10 +88,6 @@ use anchor_lang::prelude::*;
 
 use crate::errors::ErrorCode;
 
-pub fn ensure_caller_is_admin(user: Pubkey, game_admin: Pubkey) -> Result<()> {
-    todo_unimplemented(user, game_admin)
-}
-
 pub fn ensure_not_self_admin(user: Pubkey, player_user: Pubkey) -> Result<()> {
     todo_unimplemented(user, player_user)
 }
@@ -98,17 +95,6 @@ pub fn ensure_not_self_admin(user: Pubkey, player_user: Pubkey) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn allows_the_games_admin() {
-        let admin_user = Pubkey::new_unique();
-        assert!(ensure_caller_is_admin(admin_user, admin_user).is_ok());
-    }
-
-    #[test]
-    fn rejects_a_non_admin_caller() {
-        assert!(ensure_caller_is_admin(Pubkey::new_unique(), Pubkey::new_unique()).is_err());
-    }
 
     #[test]
     fn allows_transfer_to_a_different_player() {
@@ -122,6 +108,8 @@ mod tests {
     }
 }
 ```
+
+Do not add `ensure_caller_is_admin` here. `close_game.rs` already tests equal keys (ok) and unequal keys (err).
 
 The `todo_unimplemented` calls are the red state. Wire the module so `cargo test` compiles it. In `instructions/game/mod.rs`:
 
@@ -148,14 +136,9 @@ pub use transfer_game_admin::*;
 Run: `cargo test --manifest-path apps/on-chain-program/Cargo.toml transfer_game_admin`
 Expected: FAIL to compile — `cannot find function 'todo_unimplemented'`.
 
-- [ ] **Step 4: Implement the two helpers**
+- [ ] **Step 4: Implement `ensure_not_self_admin`**
 
 ```rust
-pub fn ensure_caller_is_admin(user: Pubkey, game_admin: Pubkey) -> Result<()> {
-    require_keys_eq!(user, game_admin, ErrorCode::NotGameAdmin);
-    Ok(())
-}
-
 pub fn ensure_not_self_admin(user: Pubkey, player_user: Pubkey) -> Result<()> {
     require_keys_neq!(user, player_user, ErrorCode::CannotTransferAdminToSelf);
     Ok(())
@@ -165,7 +148,7 @@ pub fn ensure_not_self_admin(user: Pubkey, player_user: Pubkey) -> Result<()> {
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `cargo test --manifest-path apps/on-chain-program/Cargo.toml transfer_game_admin`
-Expected: PASS — all four tests.
+Expected: PASS — both `ensure_not_self_admin` tests. `close_game`'s existing `ensure_caller_is_admin` tests still pass.
 
 - [ ] **Step 6: Implement the accounts struct and handler**
 
@@ -175,6 +158,7 @@ Replace the top of `transfer_game_admin.rs` (keep the `#[cfg(test)]` module) wit
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
 
+use super::close_game::ensure_caller_is_admin;
 use crate::errors::ErrorCode;
 use crate::state::{Game, User};
 
@@ -212,11 +196,9 @@ pub struct TransferGameAdmin<'info> {
     pub player_ata: UncheckedAccount<'info>,
 }
 
-pub fn ensure_caller_is_admin(user: Pubkey, game_admin: Pubkey) -> Result<()> {
-    require_keys_eq!(user, game_admin, ErrorCode::NotGameAdmin);
-    Ok(())
-}
-
+// Private import above. Do not re-declare `ensure_caller_is_admin` and do not
+// `pub use` it: `instructions/game/mod.rs` already glob-exports `close_game`,
+// and a second public copy becomes an `ambiguous_glob_reexports` warning.
 pub fn ensure_not_self_admin(user: Pubkey, player_user: Pubkey) -> Result<()> {
     require_keys_neq!(user, player_user, ErrorCode::CannotTransferAdminToSelf);
     Ok(())
@@ -345,11 +327,17 @@ Every rejection test asserts the game's `admin` pubkey is unchanged after the fa
 
 9. **Mint power follows the role.** After a transfer (do this in a test that has not quit), former host `mint_to_player` expects `NOT_GAME_ADMIN` and the target balance is unchanged. New admin `mint_to_player` of `100n` to the former host succeeds and that balance increases by `100n`.
 
-10. **Close authorization follows the role.** After a transfer, on a game that still has players, former host `close_game` expects `NOT_GAME_ADMIN`. New admin `close_game` expects `GAME_NOT_EMPTY` (they passed the admin check; the empty-game precondition is what rejected them). The `Game` account still exists in both cases.
+10. **Close authorization follows the role.** After a transfer, on a game that still has players, former host `close_game` expects `NOT_GAME_ADMIN`. New admin `close_game` expects `GAME_NOT_EMPTY` (they passed the admin check; the empty-game precondition is what rejected them). The `Game` account still exists in both cases. This is the "new admin's close is not `NotGameAdmin`" case. Do not add a second test that only repeats it.
 
-Use a distinct username suffix and `gameId` fill byte per test so accounts do not collide inside one validator run. Timeouts: `30_000`, matching `mint_to_player.test.ts`.
+11. **Chained transfer reads the live admin.** Three joined players, shared signer: creator A, players B and C. A transfers to B (`Game.admin` is B's `User` PDA). B transfers to C (`Game.admin` is C's `User` PDA). A then transfers again (target B or C). Expect `NOT_GAME_ADMIN`. `Game.admin` stays C's PDA. This is not "the creator is always admin."
 
-- [ ] **Step 2: Run the on-chain e2e file and verify all ten cases pass**
+12. **Target who already quit.** Player joins, then `quit_game` closes their ATA. Admin `transfer_game_admin` names that username and passes the derived ATA address (the account is gone, so it is empty). Expect `PLAYER_NOT_IN_GAME`. `Game.admin` unchanged. This is the uninitialized-ATA path, distinct from case 4's never-joined user.
+
+13. **ATA from another game.** Same player joined to two games, so they hold an initialized ATA for each mint. Admin of game 1 names that player but passes the player's ATA for game 2's mint. That account is real and owned by the player, and it is not the derivation for `(player, game1.mint)`. Expect `INVALID_PLAYER_ATA`. Game 1's `admin` unchanged. Case 5 (host ATA, same game) stays; this case fails a check that only compares the token-account owner.
+
+Use a distinct username suffix and `gameId` fill byte per test so accounts do not collide inside one validator run. Timeouts: `30_000`, matching `mint_to_player.test.ts`. The chained and two-game cases may need `60_000`.
+
+- [ ] **Step 2: Run the on-chain e2e file and verify all thirteen cases pass**
 
 Expected: PASS. A failure of `AccountNotInitialized` / custom error 3012 means a test minted a second system keypair — go back to the shared-signer rule before changing the instruction.
 
@@ -390,7 +378,7 @@ Tests, written before the function exists (red: `transferGameAdmin is not a func
 - `playerUsername: ""` → `{ ok: false, error: "Select a player" }`, no context call
 - `playerUsername` equal to the session username → `{ ok: false, error: "Cannot transfer the admin role to yourself" }`, no context call
 - `fetchMaybeGame` exists false → `{ ok: false, error: "Game not found" }`, `signAndSendTransaction` not called
-- success → `{ ok: true }`, and `getTransferGameAdminInstructionAsync` was called with `{ admin: { address: ADMIN_ADDRESS }, username: "hostadmin", gameId: expect.anything(), playerUsername: "bob", playerAta: PLAYER_ATA_ADDRESS }` and `{ programAddress: PROGRAM_ADDRESS }`. The username in that payload is the session value, not a field on the input.
+- success → `{ ok: true }`, and `getTransferGameAdminInstructionAsync` was called with `{ admin: { address: ADMIN_ADDRESS }, username: "hostadmin", gameId: expect.anything(), playerUsername: "bob", playerAta: PLAYER_ATA_ADDRESS }` and `{ programAddress: PROGRAM_ADDRESS }`. Call the action as `transferGameAdmin({ gameAddress, playerUsername: "bob", username: "someoneelse" } as TransferGameAdminInput)`. The built `username` is still `"hostadmin"` (the session). The extra caller field is ignored. `TransferGameAdminInput` stays `{ gameAddress, playerUsername }` — do not add a caller field to the type.
 - `isGameTokenWalletError` true for `NOT_GAME_ADMIN_CODE` → `"Only the game's admin can transfer the admin role"`
 - same for `PLAYER_NOT_IN_GAME_CODE` → `"That player hasn't joined this game"`
 - same for `CANNOT_TRANSFER_ADMIN_TO_SELF_CODE` → `"Cannot transfer the admin role to yourself"`
@@ -529,6 +517,7 @@ New tests, with `transferGameAdmin` added to the existing `vi.mock("@/server/act
 - Selecting bob and submitting calls `transferGameAdmin({ gameAddress: "Game1", playerUsername: "bob" })`. On `{ ok: true }`, the modal closes (`queryByLabelText("New admin")` is null) and `router.refresh` was called once.
 - On `{ ok: false, error: "Only the game's admin can transfer the admin role" }`, the transfer error slot shows that text and the modal stays open.
 - There is no confirm step: one click on Transfer is the submit. Assert `transferGameAdmin` was called once, and that no dialog titled like "Transfer this role?" appears.
+- In `page.test.tsx`, the existing non-admin viewer case also asserts `queryByText("Transfer admin role")` and `queryByLabelText("New admin")` are absent. The page only mounts `AdminControlsModal` when `game.isAdmin`, so a non-admin never sees the form. Do not add an `isAdmin` prop to the modal to fake this.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -588,8 +577,8 @@ In `AdminControlsModal.tsx`:
 
 - [ ] **Step 4: Run the component tests**
 
-Run: `pnpm --filter frontend exec vitest run src/app/\(app\)/games/\[address\]/AdminControlsModal.test.tsx`
-Expected: PASS, including the existing deposit tests.
+Run: `pnpm --filter frontend exec vitest run src/app/\(app\)/games/\[address\]/AdminControlsModal.test.tsx src/app/\(app\)/games/\[address\]/page.test.tsx`
+Expected: PASS, including the existing deposit tests and the non-admin page assertion.
 
 ---
 
@@ -610,8 +599,8 @@ One test, two browser contexts. `test.setTimeout(120_000)` and assertion timeout
 2. Second context: player registers, joins from `/games/all`.
 3. Host opens the game from home. Players list contains the player. Host opens Admin controls, deposits `5.00` to the player, and the player's row shows `5.00`.
 4. Still in Admin controls, the "New admin" select's options include the player and do not include the host. Choose the player. Click Transfer. There is no second dialog.
-5. After refresh, on the host's page: no `game-admin-badge`, no "Admin controls" button, no "Close game" button, and a "Quit game" button is visible. The players list still shows both users, the "Admin" label is on the player's row, and the player's balance is still `5.00`. The host's own balance is unchanged (`0.00` if nothing was minted to them).
-6. Player reloads the game. They see `game-admin-badge`, "Admin controls", and "Close game". They do not see "Quit game".
+5. The host stays on that game's URL (`/games/...`, not `/` and not a new navigation). After the in-place refresh: no `game-admin-badge`, no "Admin controls" button, no "Close game" button, and a "Quit game" button is visible. The players list still shows both users, the "Admin" label is on the player's row, and the player's balance is still `5.00`. The host's own balance is unchanged (`0.00` if nothing was minted to them).
+6. Player reloads the same game URL. They see `game-admin-badge`, "Admin controls", and "Close game". They do not see "Quit game". Opening Admin controls shows "Transfer admin role".
 7. Player opens Admin controls and deposits `1.00` to the host. Host's row shows `1.00`. This is the UI proof that mint moved with the role.
 8. Host clicks Quit game, confirms in the existing modal ("Quit this game?"), and lands on `/`. Player reloads: the host is gone from the players list, the player still has the admin badge, and "Quit game" is still absent.
 
@@ -645,13 +634,14 @@ Confirm `git diff` has no `.circleci/` change. CircleCI already runs every suite
 | Token balances untouched | Task 3 case 1, Task 6 step 5 |
 | Player count untouched | Task 3 case 1 |
 | Non-admin caller → `NotGameAdmin` | Task 3 case 3, Task 4 mapping |
-| Caller identity comes from the session | Task 4 success payload uses the session username |
+| Caller identity comes from the session | Task 4: extra `username` on the input is ignored; the instruction uses the session username |
 | Signed-out request | Task 4 |
 | Admin names themselves on-chain → `CannotTransferAdminToSelf` | Task 3 case 6 |
 | Self-transfer rejected before the chain | Task 4 |
 | Picker excludes the current admin | Task 5, Task 6 step 4 |
-| Non-member → `PlayerNotInGame` | Task 3 case 4, Task 4 |
-| Wrong token account → `InvalidPlayerAta` | Task 3 case 5, Task 4 mapping |
+| Non-member → `PlayerNotInGame` | Task 3 case 4 (never joined) and case 12 (joined, then quit), Task 4 |
+| Wrong token account → `InvalidPlayerAta` | Task 3 case 5 (same game, wrong owner) and case 13 (target's ATA for another game's mint), Task 4 mapping |
+| Chained transfer reads live `Game.admin` | Task 3 case 11 (A→B→C, then A is `NotGameAdmin`) |
 | Unknown or closed game → game not found, no transaction | Task 4 (`fetchMaybeGame` exists false; a closed game has no `Game` account) |
 | Missing game writes nothing on-chain | Task 3 case 7 |
 | Former admin can no longer deposit | Task 3 case 9, Task 6 (host no longer sees Admin controls) |
@@ -664,6 +654,6 @@ Confirm `git diff` has no `.circleci/` change. CircleCI already runs every suite
 | Admin sees the other players / non-admin does not see the control | Task 5, Task 6 |
 | Empty selection | Task 5 |
 | Only player has nobody to transfer to | Task 5 |
-| Page updates in place | Task 5 (`router.refresh`), Task 6 (same game URL) |
+| Page updates in place | Task 5 (`router.refresh`), Task 6 step 5 (former admin stays on the game URL; new admin sees the controls on reload) |
 | Home list admin label follows the role | Task 6 |
 | `Game.admin` stays a `User` PDA, account not resized | Task 3 case 1 compares the stored pubkey to `findUserPda`; Task 1 leaves `Game::INIT_SPACE` unchanged |
