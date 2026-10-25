@@ -14,6 +14,8 @@ import {
   lamports,
   assertIsTransactionWithBlockhashLifetime,
   unwrapSimulationError,
+  isSolanaError,
+  SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
   type KeyPairSigner,
   type Rpc,
   type RpcSubscriptions,
@@ -482,7 +484,19 @@ describe("transfer_game_admin instruction", () => {
       playerUsername: "xfermissing7b",
       playerAta: admin.address,
     });
-    await expect(buildAndSend(rpc, rpcSubscriptions, admin, instruction)).rejects.toThrow();
+    // The `game` account was never created, so Anchor rejects it as
+    // AccountNotInitialized (custom program error 3012) before the handler runs.
+    const ANCHOR_ERROR_ACCOUNT_NOT_INITIALIZED = 3012;
+    let cause: unknown;
+    try {
+      await buildAndSend(rpc, rpcSubscriptions, admin, instruction);
+    } catch (error) {
+      cause = unwrapSimulationError(error);
+    }
+    expect(isSolanaError(cause, SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM)).toBe(true);
+    if (isSolanaError(cause, SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM)) {
+      expect(cause.context.code).toBe(ANCHOR_ERROR_ACCOUNT_NOT_INITIALIZED);
+    }
 
     const maybe = await fetchMaybeGame(rpc, gameAddress);
     expect(maybe.exists).toBe(false);

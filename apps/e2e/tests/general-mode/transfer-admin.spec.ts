@@ -50,6 +50,8 @@ test("the admin transfers the role, the new admin deposits, and the former admin
     page.getByTestId("players-list").locator("li").filter({ hasText: playerUsername }),
   ).toContainText("5.00", { timeout: 60_000 });
 
+  // A successful deposit closes the modal and refreshes the page.
+  await page.getByRole("button", { name: "Admin controls" }).click();
   const newAdmin = page.getByLabel("New admin");
   await expect(newAdmin.locator("option", { hasText: playerUsername })).toHaveCount(1);
   await expect(newAdmin.locator("option", { hasText: hostUsername })).toHaveCount(0);
