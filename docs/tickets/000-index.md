@@ -34,6 +34,7 @@ touches one of those areas.
 | 019 | Remove no-op scaffolding; relocate dashboard to `/`                                       | 001, 003      | Done    |
 | 020 | Redirect authenticated users off `/login`/`/register`; migrate `middleware.ts`→`proxy.ts` | 001, 003, 019 | Done    |
 | 021 | Auto-join admin as player at game creation                                                | 005, 006      | Done    |
+| 022 | ATA existence is not game membership                                                      | 006           | Pending |
 
 ## Dependency diagram
 
@@ -60,6 +61,7 @@ graph TD
     019["019 Remove no-op scaffolding; relocate dashboard to /"]
     020["020 Redirect authenticated users off login/register; migrate to proxy.ts"]
     021["021 Auto-join admin as player at game creation"]
+    022["022 ATA existence is not game membership"]
 
     001 --> 002
     001 --> 017
@@ -96,6 +98,7 @@ graph TD
     019 --> 020
     005 --> 021
     006 --> 021
+    006 --> 022
 
     classDef done stroke:#2ecc71,stroke-width:3px;
     classDef inProgress stroke:#f1c40f,stroke-width:3px;
